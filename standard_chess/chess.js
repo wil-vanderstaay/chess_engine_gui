@@ -750,10 +750,10 @@ function piece_movement(div, pos) {
 
 // INITIALISE BOARD ----------------------------------------------------------------------------------------------------------------------
 
-function make_table() {
+function make_table(player_white) {
     let table = '<table id="chess-table" class="chess-board">';
     for (let row = 0; row < 8; row++) {
-        if (PLAYER_WHITE) {
+        if (player_white) {
             table += '<tr><th>' + (8 - row).toString() + '</th>'; 
         } else {
             table += '<tr><th>' + (row + 1).toString() + '</th>';  
@@ -768,7 +768,7 @@ function make_table() {
         }
         table += '</tr>';
     }
-    if (PLAYER_WHITE) {
+    if (player_white) {
         table += '<th></th><th>a</th><th>b</th><th>c</th><th>d</th><th>e</th><th>f</th><th>g</th><th>h</th></table>';
     } else {
         table += '<th></th><th>h</th><th>g</th><th>f</th><th>e</th><th>d</th><th>c</th><th>b</th><th>a</th></table>';
@@ -1324,9 +1324,9 @@ function undo_move() {
 }
 
 function play_fen(whiteDown) {
-    FEN = document.getElementById("fen").value;
-    if (FEN.length < 10) { FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
-    main(whiteDown);
+    let fen = document.getElementById("fen").value;
+    if (fen.length < 10) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
+    start_game(fen, whiteDown, 5);
 }
 
 function get_game_moves() {
@@ -1451,20 +1451,20 @@ function play_rand_endgame(number) {
         index = Math.floor(Math.random() * ENGAMES.length);
     } 
     console.log("ENDGAME INDEX: " + (index));
-    FEN = ENGAMES[index][0];
+    let fen = ENGAMES[index][0];
     document.getElementById("endgame_winning").value = (index + 1) + ": " + (ENGAMES[index][1]);
 
     // document.getElementById("endgame_winning").innerHTML = '<h4 style="text-align: center;">' + ENGAMES[index][1] + '</h4>';
 
     i = 0;
-    while (i < FEN.length) {
-        if (FEN[i] == " ") {
-            PLAYER_WHITE = FEN[i + 1] == "w";
+    while (i < fen.length) {
+        if (fen[i] == " ") {
+            PLAYER_WHITE = fen[i + 1] == "w";
             break;
         }
         i++;
     }
-    main(PLAYER_WHITE);
+    start_game(fen, PLAYER_WHITE, 5);
 }
 
 function load_endgame() {
@@ -1477,16 +1477,16 @@ function play_book_endgame() {
     ]
     let index = Math.floor(Math.random() * ENGAMES.length);
     console.log("ENDGAME INDEX: " + (index));
-    FEN = ENGAMES[index];
+    let fen = ENGAMES[index];
     i = 0;
-    while (i < FEN.length) {
-        if (FEN[i] == " ") {
-            PLAYER_WHITE = FEN[i + 1] == "w";
+    while (i < fen.length) {
+        if (fen[i] == " ") {
+            PLAYER_WHITE = fen[i + 1] == "w";
             break;
         }
         i++;
     }
-    main(PLAYER_WHITE);
+    start_game(fen, PLAYER_WHITE, 5);
 }
 
 function showLines() {
@@ -1506,34 +1506,40 @@ function override_depth() {
     alert("Depth updated");
 }
 
-function main(whiteDown) {
+function reset_globals(fen) {
     DISABLE_LOOKAHEAD = false;
-    PLAYER_WHITE = whiteDown;
+    GAME = [];
 
-    MOVE_NUMBER = 1; GAME = [];
-    if (FEN == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
+    if (fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
         MOVE_NUMBER = 1;
         GAME_MOVES = [];
-    } else if (FEN == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
-        GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
-
+    } else if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
         MOVE_NUMBER = 28;
+        GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
     } else {
-        MOVE_NUMBER = Math.max(10, parseInt(FEN[FEN.length - 1]));
+        MOVE_NUMBER = Math.max(10, parseInt(fen[fen.length - 1]));
         GAME_MOVES = [];
     }
-    make_table();
+}
 
-    console.log(FEN);
-    BOARD = make_board(FEN);
-    hash_key = init_hash();
-
+function set_gamephase() {
     let gamephase_score = get_gamephase_score();
     if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
     else if (gamephase_score < endgame_phase) { GAMEPHASE = 2; }
     else { GAMEPHASE = 1; }
+}
 
-    LOOKAHEAD = start_look;
+function start_game(fen, whiteDown, startLookahead, aiGame=false) { // default player vs. ai
+    reset_globals(fen);
+
+    PLAYER_WHITE = whiteDown;
+    LOOKAHEAD = startLookahead;
+
+    make_table(whiteDown);
+    BOARD = make_board(fen);
+    hash_key = init_hash();
+
+    set_gamephase();
 
     display_board();
 }
@@ -1544,7 +1550,6 @@ let PAWN_ATTACK;
 let KNIGHT_ATTACK;
 let KING_ATTACK;
 
-let BOARD;
 
 let PLAYER_WHITE;
 let TURN; // 0 for player, 1 for ai
@@ -1553,21 +1558,17 @@ let EN_PASSANT_SQUARE; // pawn moves 2 spots, record position behind pawn
 
 let LOOKAHEAD_COUNT = 0;
 let LOOKAHEAD;
-let start_look = 5;
 
 let GAMEPHASE = 0;
 let opening_phase = 6192;
 let endgame_phase = 518;
 
-let GAME = [];
-let GAME_MOVES = [];
-let MOVE_NUMBER = 1;
+let BOARD;
+let GAME; // for easy undo move
+let GAME_MOVES;
+let MOVE_NUMBER;
 
 initialiseConstants();
 initialise_ai_constants();
 
-let FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; // start
-
-console.log("TESTING THE DEVELOP BRANCH");
-
-main(true);
+start_game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true, 5);
