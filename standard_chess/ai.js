@@ -520,7 +520,10 @@ let book_games = [
 ];
 
 function book_move() {
-    if (MOVE_NUMBER > 10) { return 0; }
+    if (get_move_number() > 10 || document.getElementById("fen").value) { // don't book move when loaded fen
+        return 0; 
+    }
+
     let res = [];
     let game_so_far = get_game_moves();
     for (let i = 0; i < book_games.length; i++) {

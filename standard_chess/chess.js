@@ -492,14 +492,15 @@ function do_move(move) {
 
 // HTML BOARD ----------------------------------------------------------------------------------------------------------------------
 
+function get_move_number() {
+    return (GAME_MOVES.length / 2 + 1) << 0;
+}
+
 function display_board(last_move) {
     GAME.push(copy_board(BOARD));
-    if (!TURN) {
-        if (PLAYER_WHITE) { document.getElementById("move_number").innerHTML = "Move number: " + (MOVE_NUMBER); }
-        else { MOVE_NUMBER++; }
-    } else {
-        if (!PLAYER_WHITE) { document.getElementById("move_number").innerHTML = "Move number: " + (MOVE_NUMBER); }
-        else { MOVE_NUMBER++; }
+
+    if (TURN ^ PLAYER_WHITE) {
+        document.getElementById("move_number").innerHTML = "Move number: " + (get_move_number()); 
     }
 
     let table = document.getElementById("chess-table");
@@ -1312,8 +1313,6 @@ function finish() {
 function undo_move() {
     GAME.pop();
     GAME.pop();
-    MOVE_NUMBER--;
-    if (!PLAYER_WHITE) { MOVE_NUMBER--; }
     BOARD = GAME[GAME.length - 1];
     GAME.pop(); // pushed back on in display_board
 
@@ -1325,8 +1324,12 @@ function undo_move() {
 
 function play_fen(whiteDown) {
     let fen = document.getElementById("fen").value;
-    if (fen.length < 10) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
-    start_game(fen, whiteDown, 5);
+    // 8/8/8/8/8/8/8/kK6 w = min fen
+    if (fen.length < 19) { 
+        fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
+        document.getElementById("fen").value = "";
+    }
+    start_game(whiteDown, fen);
 }
 
 function get_game_moves() {
@@ -1464,7 +1467,8 @@ function play_rand_endgame(number) {
         }
         i++;
     }
-    start_game(fen, PLAYER_WHITE, 5);
+    document.getElementById("fen").value = fen;
+    start_game(PLAYER_WHITE, fen);
 }
 
 function load_endgame() {
@@ -1486,7 +1490,8 @@ function play_book_endgame() {
         }
         i++;
     }
-    start_game(fen, PLAYER_WHITE, 5);
+    document.getElementById("fen").value = fen;
+    start_game(PLAYER_WHITE, fen);
 }
 
 function showLines() {
@@ -1506,22 +1511,6 @@ function override_depth() {
     alert("Depth updated");
 }
 
-function reset_globals(fen) {
-    DISABLE_LOOKAHEAD = false;
-    GAME = [];
-
-    if (fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {
-        MOVE_NUMBER = 1;
-        GAME_MOVES = [];
-    } else if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
-        MOVE_NUMBER = 28;
-        GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
-    } else {
-        MOVE_NUMBER = Math.max(10, parseInt(fen[fen.length - 1]));
-        GAME_MOVES = [];
-    }
-}
-
 function set_gamephase() {
     let gamephase_score = get_gamephase_score();
     if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
@@ -1529,8 +1518,14 @@ function set_gamephase() {
     else { GAMEPHASE = 1; }
 }
 
-function start_game(fen, whiteDown, startLookahead, aiGame=false) { // default player vs. ai
-    reset_globals(fen);
+function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
+    DISABLE_LOOKAHEAD = false;
+    GAME = [];
+    GAME_MOVES = [];
+
+    if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
+        GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
+    }
 
     PLAYER_WHITE = whiteDown;
     LOOKAHEAD = startLookahead;
@@ -1550,7 +1545,6 @@ let PAWN_ATTACK;
 let KNIGHT_ATTACK;
 let KING_ATTACK;
 
-
 let PLAYER_WHITE;
 let TURN; // 0 for player, 1 for ai
 let CASTLE = create_castle();
@@ -1566,9 +1560,8 @@ let endgame_phase = 518;
 let BOARD;
 let GAME; // for easy undo move
 let GAME_MOVES;
-let MOVE_NUMBER;
 
 initialiseConstants();
 initialise_ai_constants();
 
-start_game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", true, 5);
+start_game(true);
