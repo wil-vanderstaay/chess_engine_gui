@@ -1568,4 +1568,6 @@ initialise_ai_constants();
 
 let FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; // start
 
+console.log("TESTING THE DEVELOP BRANCH");
+
 main(true);
