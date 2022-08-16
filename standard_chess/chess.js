@@ -265,12 +265,22 @@ function create_board(board) {
     res[14] = or_bitboards(res[12], res[13]); // board
     return res;
 }
+
 function copy_board(board) {
     let res = [];
     for (let i = 0; i < board.length; i++) {
         res.push(copy_bitboard(board[i]));
     }
     return res;
+}
+
+function equal_boards(board1, board2) {
+    for (let i = 0; i < board1.length; i++) {
+        if (board1[0] != board2[0] || board1[1] != board2[1]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 function legal_move(pos, new_pos) {
@@ -496,13 +506,8 @@ function get_move_number() {
     return (GAME_MOVES.length / 2 + 1) << 0;
 }
 
-function display_board(last_move) {
+function display_board() {
     GAME.push(copy_board(BOARD));
-
-    if (TURN ^ PLAYER_WHITE) {
-        document.getElementById("move_number").innerHTML = "Move number: " + (get_move_number()); 
-    }
-
     let table = document.getElementById("chess-table");
     for (let i = 0; i < 64; i++) {
         let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
@@ -513,98 +518,112 @@ function display_board(last_move) {
             for (let j = 0; j < 12; j++) {
                 if (get_bit(BOARD[j], i)) {
                     let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
-                    let piece_white = piece_number < 6;
-
                     let piece = '<img draggable="false" style="width: 70px; height: 70px;" src="../chess_piece_images/' + (piece_number) + '.png">';
                     piece_location.innerHTML = '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
+                    pieceDrag(document.getElementById((i)), i, false);
+                    break;
+                }
+            }
+        }
+    }
+}
 
+function highlightLastMove(last_move) {
+    let table = document.getElementById("chess-table");
+    let lcode = "#B8E2F2"; let dcode = "#77C3EC";
+
+    let move_source = get_move_source(last_move);
+    let move_target = get_move_target(last_move);
+
+    let s_location = table.rows.item(move_source / 8 >> 0).cells.item(move_source % 8 + 1);
+    let t_location = table.rows.item(move_target / 8 >> 0).cells.item(move_target % 8 + 1);
+
+    s_location.style.background = (s_location.className == "light") ? lcode : dcode;
+    t_location.style.background = (t_location.className == "light") ? lcode : dcode;
+}
+
+function doAiMove() {
+    let res = search(LOOKAHEAD);
+    let evaluation = res[0]; let time = res[1]; let moves = res[2];
+    let best_move = pv_table[0][0];
+
+    if (!do_move(best_move)) {
+        return finish();
+    }
+
+    // Print search details
+    document.getElementById("move_number").innerHTML = "Move number: " + (get_move_number() + PLAYER_WHITE);
+    document.getElementById("analysed").value = (COUNT);
+    document.getElementById("depth_input").value = (LOOKAHEAD);
+    document.getElementById("time").value = (time) + " ms";
+    document.getElementById("move").value = get_move_desc(best_move, moves);
+
+    if (PLAYER_WHITE) { 
+        evaluation *= -1;
+    }
+    GAME_MOVES.push(document.getElementById("move").value);
+
+    evaluation = Math.round(evaluation + Number.EPSILON);
+    if (evaluation < -99900) {
+        if (evaluation == -99999) { setTimeout(() => {  return finish(); }, 250); }
+        evaluation = "-M" + ((99999 + evaluation) / 2 << 0);
+    } else if (evaluation > 99900) {
+        if (evaluation == 99999) { setTimeout(() => {  return finish(); }, 250); }
+        evaluation = "M" + ((99999 - evaluation + 1) / 2 << 0);
+    } else { evaluation /= 100; }
+
+    document.getElementById("evaluation").value = evaluation;
+    showLines();         
+
+    if (!DISABLE_LOOKAHEAD) {
+        if (!time) {
+            // book move
+        } else if (time < 750) { // under 0.5s, INCREASE
+            LOOKAHEAD_COUNT = 2;
+        } else if (time < 1500) {
+            LOOKAHEAD_COUNT++;
+        } else if (time > 15000) { // over 15s, DECREASE
+            LOOKAHEAD_COUNT = -2;
+        } else if (time > 7500) {
+            LOOKAHEAD_COUNT--;
+        }
+
+        if (LOOKAHEAD_COUNT >= 2) { // 2 fast moves
+            LOOKAHEAD++;
+            LOOKAHEAD_COUNT = 0;
+        } else if (LOOKAHEAD_COUNT <= -2) { // 2 slow moves
+            LOOKAHEAD--;
+            LOOKAHEAD_COUNT = 0
+        }
+    }
+
+    let gamephase_score = get_gamephase_score();
+    if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
+    else if (gamephase_score < endgame_phase) { GAMEPHASE = 2; }
+    else { GAMEPHASE = 1; }
+
+    display_board();
+    highlightLastMove(best_move);
+}
+
+function doHumanMove() {
+    for (let i = 0; i < 64; i++) {
+        if (get_bit(BOARD[14], i)) {
+            for (let j = 0; j < 12; j++) {
+                if (get_bit(BOARD[j], i)) {
+                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
+                    let piece_white = piece_number < 6;
                     pieceDrag(document.getElementById((i)), i, !(piece_white ^ PLAYER_WHITE));
                     break;
                 }
             }
         }
     }
-
-    if (get_move_piece(last_move) >= 6) { // show ai move
-        let lcode = "#B8E2F2"; let dcode = "#77C3EC";
-
-        let move_source = get_move_source(last_move);
-        let move_target = get_move_target(last_move);
-
-        let s_location = table.rows.item(move_source / 8 >> 0).cells.item(move_source % 8 + 1);
-        let t_location = table.rows.item(move_target / 8 >> 0).cells.item(move_target % 8 + 1);
-
-        s_location.style.background = (s_location.className == "light") ? lcode: dcode;
-        t_location.style.background = (t_location.className == "light") ? lcode : dcode;
-    }
-
-    if (TURN) { // ai turn
-        let res = search(LOOKAHEAD);
-        let evaluation = res[0]; let time = res[1]; let moves = res[2];
-        let best_move = pv_table[0][0];
-
-        if (!do_move(best_move)) {
-            return finish();
-        }
-
-        // Print search details
-        document.getElementById("analysed").value = (COUNT);
-        document.getElementById("depth_input").value = (LOOKAHEAD);
-        document.getElementById("time").value = (time) + " ms";
-        document.getElementById("move").value = get_move_desc(best_move, moves);
-
-        if (PLAYER_WHITE) { 
-            evaluation *= -1;
-        }
-        GAME_MOVES.push(document.getElementById("move").value);
-
-        evaluation = Math.round(evaluation + Number.EPSILON);
-        if (evaluation < -99900) {
-            if (evaluation == -99999) { setTimeout(() => {  return finish(); }, 250); }
-            evaluation = "-M" + ((99999 + evaluation) / 2 << 0);
-        } else if (evaluation > 99900) {
-            if (evaluation == 99999) { setTimeout(() => {  return finish(); }, 250); }
-            evaluation = "M" + ((99999 - evaluation + 1) / 2 << 0);
-        }
-
-        document.getElementById("evaluation").value = evaluation / 100;
-        showLines();         
-
-        if (!DISABLE_LOOKAHEAD) {
-            if (!time) {
-                // book move
-            } else if (time < 750) { // under 0.5s, INCREASE
-                LOOKAHEAD_COUNT = 2;
-            } else if (time < 1500) {
-                LOOKAHEAD_COUNT++;
-            } else if (time > 15000) { // over 15s, DECREASE
-                LOOKAHEAD_COUNT = -2;
-            } else if (time > 7500) {
-                LOOKAHEAD_COUNT--;
-            }
-
-            if (LOOKAHEAD_COUNT >= 2) { // 2 fast moves
-                LOOKAHEAD++;
-                LOOKAHEAD_COUNT = 0;
-            } else if (LOOKAHEAD_COUNT <= -2) { // 2 slow moves
-                LOOKAHEAD--;
-                LOOKAHEAD_COUNT = 0
-            }
-        }
-
-        let gamephase_score = get_gamephase_score();
-        if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
-        else if (gamephase_score < endgame_phase) { GAMEPHASE = 2; }
-        else { GAMEPHASE = 1; }
-
-        display_board(best_move);
-
-
-    }    
 }
 
 let min_left = 34; let min_top = 14; let width = 84;
 let SELECTED_PIECE = 64;
+
 function pieceDrag(div, pos, pieceTurn) {
     let pos1 = 0; let pos2 = 0; let pos3 = 0; let pos4 = 0;
     setPosition();
@@ -739,8 +758,12 @@ function pieceDrag(div, pos, pieceTurn) {
                 document.getElementById("loading").innerHTML = res.slice(0, res.length - 4);
                 
                 setTimeout(() => {  
+
                     document.getElementById("loading").innerHTML = "";
                     display_board(move); 
+                    doAiMove();
+                    doHumanMove();
+
                 }, 250);
                 return true;
             }
@@ -1320,6 +1343,7 @@ function undo_move() {
     GAME_MOVES.pop();
 
     display_board();
+    doHumanMove();
 }
 
 function play_fen(whiteDown) {
@@ -1518,7 +1542,8 @@ function set_gamephase() {
     else { GAMEPHASE = 1; }
 }
 
-function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
+async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
+    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
     DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_MOVES = [];
@@ -1537,6 +1562,26 @@ function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR 
     set_gamephase();
 
     display_board();
+
+    if (aiGame) {
+        let moves = 0;
+        while (moves < 20) {
+            await delay(0.25);
+            doAiMove();
+            moves++;
+        }
+    } else {
+        if (!PLAYER_WHITE) {
+            doAiMove();
+        }
+        doHumanMove();
+    }
+}
+
+function delay(n){
+    return new Promise(function(resolve){
+        setTimeout(resolve,n*1000);
+    });
 }
 
 // CONSTANTS  ----------------------------------------------------------------------------------------------------------------------
