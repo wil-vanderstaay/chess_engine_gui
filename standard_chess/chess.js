@@ -507,21 +507,25 @@ function display_board(last_move) {
     for (let i = 0; i < 64; i++) {
         let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
         piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
-        for (let j = 0; j < 12; j++) {
-            piece_location.innerHTML = "";
-            if (get_bit(BOARD[j], i)) {
-                if (!PLAYER_WHITE) {
-                    j = 6 * (1 - (j / 6 >> 0)) + j % 6;
+        piece_location.innerHTML = "";
+
+        if (get_bit(BOARD[14], i)) {
+            for (let j = 0; j < 12; j++) {
+                if (get_bit(BOARD[j], i)) {
+                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
+                    let piece_white = piece_number < 6;
+
+                    let piece = '<img draggable="false" style="width: 70px; height: 70px;" src="../chess_piece_images/' + (piece_number) + '.png">';
+                    piece_location.innerHTML = '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
+
+                    pieceDrag(document.getElementById((i)), i, !(piece_white ^ PLAYER_WHITE));
+                    break;
                 }
-                let piece = '<img draggable="false" style="width: 70px; height: 70px;" src="../chess_piece_images/' + (j) + '.png">';
-                piece_location.innerHTML = '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
-                piece_movement(document.getElementById((i)), i);
-                break;
             }
         }
     }
 
-    if (get_move_piece(last_move) >= 6) {
+    if (get_move_piece(last_move) >= 6) { // show ai move
         let lcode = "#B8E2F2"; let dcode = "#77C3EC";
 
         let move_source = get_move_source(last_move);
@@ -599,23 +603,16 @@ function display_board(last_move) {
     }    
 }
 
-function piece_movement(div, pos) {
-    let min_left = 34; let min_top = 14; let width = 84;
+let min_left = 34; let min_top = 14; let width = 84;
+let SELECTED_PIECE = 64;
+function pieceDrag(div, pos, pieceTurn) {
     let pos1 = 0; let pos2 = 0; let pos3 = 0; let pos4 = 0;
-    let selected = false;
-    let flashing = false;
-
-    let down_function = dragMouseDown;
-    if (TURN == 2 || (TURN && get_bit(BOARD[12], pos)) || (!TURN && get_bit(BOARD[13], pos))) {
-        down_function = null;
-    }
-    div.onmousedown = down_function;
     setPosition();
+    if (pieceTurn) { div.onmousedown = openDragElement; }
 
-    function setPosition(position=-1) {
-        // Move piece to centre of tile
-        rem_top = (div.offsetTop - min_top) % width;
-        rem_left = (div.offsetLeft - min_left) % width;
+    function setPosition() {
+        let rem_top = (div.offsetTop - min_top) % width;
+        let rem_left = (div.offsetLeft - min_left) % width;
         if (rem_top > width/2) {
             rem_top -= width;
         }
@@ -624,34 +621,28 @@ function piece_movement(div, pos) {
         }
         div.style.top = (div.offsetTop - rem_top) + "px";
         div.style.left = (div.offsetLeft - rem_left) + "px";
-
-        if (position > -1 && position != pos) {
-            let target_div = document.getElementById((position));
-            if (target_div) {
-                target_div.innerHTML = "";
-            }
-        }
     }
 
-    function flash() {
-        flashing = true;
-        document.getElementById("chess-table").rows.item(pos / 8 >> 0).cells.item(pos % 8 + 1).style.background = "#FF0000"; // RED
-        setTimeout(() => {  
-            flashing = false;
-            display_board(); 
-        }, 250);
-    }
-    
-    function dragMouseDown(e) {
+    function openDragElement(e) {
         e = e || window.event;
-        e.preventDefault();
         pos3 = e.clientX;
         pos4 = e.clientY;
+
+        // Reset board colours
+        let table = document.getElementById("chess-table");
+        for (let i = 0; i < 64; i++) {
+            let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
+            if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
+                piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
+            }
+            piece_location.onclick = null;
+        }
+
         document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
+        document.onmousemove = dragElement;
     }
 
-    function elementDrag(e) {
+    function dragElement(e) {
         e = e || window.event;
         pos1 = pos3 - e.clientX;
         pos2 = pos4 - e.clientY;
@@ -661,7 +652,7 @@ function piece_movement(div, pos) {
         div.style.left = (div.offsetLeft - pos1) + "px";
     }
 
-    function closeDragElement() {
+    function closeDragElement(e) {
         document.onmouseup = null;
         document.onmousemove = null;
         setPosition();
@@ -670,49 +661,62 @@ function piece_movement(div, pos) {
         let new_col = (div.offsetLeft - min_left) / width;
         let new_pos = 8 * new_row + new_col;
 
-        setPosition(new_pos);
-        if (new_pos != pos) { 
-            doLegalMove(new_pos);
+        setPosition();
+
+        if (pos == new_pos) {
+            clickMovePiece();
         } else {
-            clickShowMoves();
+            if (!doLegalMove(new_pos)) { // reset piece position
+                div.style.top = ((pos / 8 << 0) * width + min_top) + "px";
+                div.style.left = ((pos % 8) * width + min_left) + "px";
+            }
         }
     }
 
-    function clickShowMoves() {
-        selected = !selected
+    function clickMovePiece() {
         let table = document.getElementById("chess-table");
 
-        // Reset other coloured cells
-        for (let i = 0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-                if (8 * i + j != pos || !selected) {
-                    let cell = table.rows.item(i).cells.item(j + 1);
-                    cell.style.background = (cell.className == "light") ? "#f1d9c0" : "#a97a65";
-                    cell.onclick = null;
+        if (SELECTED_PIECE == pos) { return; } // remove selection
+
+         // Highlight piece
+         let piece_location = table.rows.item(pos / 8 >> 0).cells.item(pos % 8 + 1);
+         piece_location.style.background = (piece_location.className == "light") ? "#bbe0ae" : "#75c15b";
+
+        // Determine legal piece moves
+        let moves = generate_pseudo_moves();
+        let move_targets = [];
+        for (let i = 0; i < moves.length; i++) {
+            if (get_move_source(moves[i]) == pos) {
+                move_targets.push(get_move_target(moves[i]));
+            }
+        }
+
+        // Add onclick for doing nothing
+        for (let i = 0; i < 64; i++) {
+            let cell = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
+            if (i == pos) { continue; }
+            cell.onclick = function() {
+                SELECTED_PIECE = 64;
+                if (get_bit(BOARD[14], i)) { SELECTED_PIECE = i; }
+                // Reset board colours
+                for (let j = 0; j < 64; j++) {
+                    let piece_location = table.rows.item(j / 8 >> 0).cells.item(j % 8 + 1);
+                    if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
+                        piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
+                    }
+                    piece_location.onclick = null;
                 }
             }
         }
 
-        if (selected && !flashing) {
-            // Determine legal piece moves
-            let moves = generate_pseudo_moves();
-            let piece_moves = [];
-            for (let i = 0; i < moves.length; i++) {
-                if (get_move_source(moves[i]) == pos) {
-                    piece_moves.push(moves[i]);
-                }
-            }
+        // Add onclick for legal piece moves
+        for (let i = 0; i < move_targets.length; i++) {
+            let target = move_targets[i];
+            let move_location = table.rows.item(target / 8 >> 0).cells.item(target % 8 + 1);
 
-            // Highlight legal piece moves
-            for (let i = 0; i < piece_moves.length; i++) {
-                let target = get_move_target(piece_moves[i]);
-                let move_location = table.rows.item(target/ 8 >> 0).cells.item(target % 8 + 1);
-                move_location.style.background = (move_location.className == "light") ? "#bbe0ae" : "#75c15b";
-
-                move_location.onclick = function() {
-                    doLegalMove(target);
-                    move_location.onclick = null;
-                }
+            move_location.onclick = function() {
+                SELECTED_PIECE = 64;
+                doLegalMove(target);
             }
         }
     }
@@ -727,8 +731,6 @@ function piece_movement(div, pos) {
             if (do_move(move)) {
                 GAME_MOVES.push(get_move_desc(move, moves));
 
-                div.onmousedown = null;
-
                 let message = "LOADING";
                 let res = "";
                 for (let i = 0; i < message.length; i++) {
@@ -740,12 +742,10 @@ function piece_movement(div, pos) {
                     document.getElementById("loading").innerHTML = "";
                     display_board(move); 
                 }, 250);
-            } else {
-                flash();
+                return true;
             }
-        } else {
-            flash();    
         }
+        return false;
     }
 }
 
