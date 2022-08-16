@@ -181,9 +181,6 @@ function xor_bitboards(bitboard1, bitboard2) {
 function nand_bitboards(bitboard1, bitboard2) {
     return and_bitboards(bitboard1, not_bitboard(bitboard2));
 }
-// function equal_bitboards(bitboard1, bitboard2) {
-//     return bitboard1[0] == bitboard2[1] && bitboard1[1] == bitboard2[1];
-// }
 
 function get_bit(bitboard, i) {
     if (i < 32) { 
@@ -272,15 +269,6 @@ function copy_board(board) {
         res.push(copy_bitboard(board[i]));
     }
     return res;
-}
-
-function equal_boards(board1, board2) {
-    for (let i = 0; i < board1.length; i++) {
-        if (board1[0] != board2[0] || board1[1] != board2[1]) {
-            return false;
-        }
-    }
-    return true;
 }
 
 function legal_move(pos, new_pos) {
@@ -767,6 +755,12 @@ function pieceDrag(div, pos, pieceTurn) {
                 }, 250);
                 return true;
             }
+            let king_pos = TURN ? lsb_index(BOARD[11]) : lsb_index(BOARD[5]);
+            let king_location = document.getElementById("chess-table").rows.item(king_pos / 8 >> 0).cells.item(king_pos % 8 + 1);
+            king_location.style.background = "#FF0000"; // RED
+            setTimeout(() => {
+                king_location.style.background = (king_location.className == "light") ? "#f1d9c0" : "#a97a65";
+            }, 300);
         }
         return false;
     }
