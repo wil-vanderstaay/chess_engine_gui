@@ -760,7 +760,7 @@ function pieceDrag(div, pos, pieceTurn) {
             king_location.style.background = "#FF0000"; // RED
             setTimeout(() => {
                 king_location.style.background = (king_location.className == "light") ? "#f1d9c0" : "#a97a65";
-            }, 300);
+            }, 250);
         }
         return false;
     }
