@@ -1566,8 +1566,9 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     if (aiGame) {
         let moves = 0;
         while (moves < 20) {
-            await delay(0.5);
-            doAiMove();
+            await new Promise(function(resolve){
+                setTimeout(resolve, 0.5 * 1000);
+            });
             moves++;
         }
     } else {
@@ -1576,12 +1577,6 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
         }
         doHumanMove();
     }
-}
-
-function delay(n){
-    return new Promise(function(resolve){
-        setTimeout(resolve,n*1000);
-    });
 }
 
 // CONSTANTS  ----------------------------------------------------------------------------------------------------------------------
