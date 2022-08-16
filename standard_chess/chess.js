@@ -1566,7 +1566,7 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     if (aiGame) {
         let moves = 0;
         while (moves < 20) {
-            await delay(0.25);
+            await delay(0.5);
             doAiMove();
             moves++;
         }
