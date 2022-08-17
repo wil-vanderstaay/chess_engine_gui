@@ -29,6 +29,7 @@
                 
                 <input style="width:100px; height:40px;" type="button" value="White" onclick="start_game(true)">
                 <input style="width:100px; height:40px;" type="button" value="Black" onclick="start_game(false)">
+                <input style="width:100px; height:40px;" type="button" value="AI" onclick="start_game(true, null, 5, true)">
                 <br><br>
 
                 <input id="fen" type="text"><input type="button" value="Play fen" onclick="play_fen(true)">
@@ -66,6 +67,7 @@
         </div>
 
         <script src="ai.js"></script>
+        <script src="basicAi.js"></script>
         <script src="chess.js"></script>
     </body>
 </html>

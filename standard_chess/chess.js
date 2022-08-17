@@ -273,9 +273,6 @@ function copy_board(board) {
 
 function legal_move(pos, new_pos) {
     let moves = generate_pseudo_moves();
-    if (!moves.length) {
-        return [moves, finish()];
-    }
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
         if (get_move_source(move) == pos && get_move_target(move) == new_pos) {
@@ -285,7 +282,7 @@ function legal_move(pos, new_pos) {
     return [moves, false];
 }
 
-function print_board(board, display=1) {
+function print_board(board) {
     let res = [];
     for (let i = 0; i < 8; i++) {
         let row = [];
@@ -333,16 +330,12 @@ function print_board(board, display=1) {
         }
         res.push(row);
     }
-    if (display) {
-        console.log(res);
-        console.log();
-    } else {
-        return res;
-    }
+    console.log(res);
+    console.log();
 }
 
 function do_move(move) {
-    if (!move) { return 0; }
+    if (!move) { return false; }
 
     let cb = copy_board(BOARD);
     let cc = CASTLE;
@@ -481,11 +474,11 @@ function do_move(move) {
         CASTLE = cc;
         EN_PASSANT_SQUARE = ce;
         hash_key = ch;
-        return 0;
+        return false;
     }
     TURN ^= 1;
     hash_key = xor_bitboards(hash_key, ZOB_TABLE[64]);
-    return 1;
+    return true;
 }
 
 // HTML BOARD ----------------------------------------------------------------------------------------------------------------------
@@ -496,6 +489,8 @@ function get_move_number() {
 
 function display_board() {
     GAME.push(copy_board(BOARD));
+    GAME_HASH.push(copy_bitboard(hash_key));
+
     let table = document.getElementById("chess-table");
     for (let i = 0; i < 64; i++) {
         let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
@@ -530,8 +525,10 @@ function highlightLastMove(last_move) {
     t_location.style.background = (t_location.className == "light") ? lcode : dcode;
 }
 
-function doAiMove() {
-    let res = search(LOOKAHEAD);
+function doAiMove(differentAi=false) {
+    let res;
+    if (differentAi) { res = basicSearch(4); } 
+    else { res = search(LOOKAHEAD); }
     let evaluation = res[0]; let time = res[1]; let moves = res[2];
     let best_move = pv_table[0][0];
 
@@ -563,7 +560,7 @@ function doAiMove() {
     document.getElementById("evaluation").value = evaluation;
     showLines();         
 
-    if (!DISABLE_LOOKAHEAD) {
+    if (!DISABLE_LOOKAHEAD && !differentAi) {
         if (!time) {
             // book move
         } else if (time < 750) { // under 0.5s, INCREASE
@@ -1322,7 +1319,7 @@ function finish() {
         }
     }
     setTimeout(() => { alert(message); }, 250);
-    TURN = 2; // prevent moving pieces
+    // TURN = 2; // prevent moving pieces
 }
 
 // HTML FEATURES ----------------------------------------------------------------------------------------------------------------------
@@ -1540,6 +1537,7 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
     DISABLE_LOOKAHEAD = false;
     GAME = [];
+    GAME_HASH = [];
     GAME_MOVES = [];
 
     if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
@@ -1559,10 +1557,11 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
 
     if (aiGame) {
         let moves = 0;
-        while (moves < 20) {
-            await new Promise(function(resolve){
-                setTimeout(resolve, 0.5 * 1000);
-            });
+        while (moves < 60) {
+            doAiMove();
+            await delay(0.5);
+            doAiMove(true);
+            await delay(0.5);
             moves++;
         }
     } else {
@@ -1571,6 +1570,12 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
         }
         doHumanMove();
     }
+}
+
+async function delay(n) {
+    await new Promise(function(resolve){
+        setTimeout(resolve, n * 1000);
+    });
 }
 
 // CONSTANTS  ----------------------------------------------------------------------------------------------------------------------
@@ -1593,6 +1598,7 @@ let endgame_phase = 518;
 
 let BOARD;
 let GAME; // for easy undo move
+let GAME_HASH;
 let GAME_MOVES;
 
 initialiseConstants();

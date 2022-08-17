@@ -868,11 +868,27 @@ function best_eval(depth, alpha, beta) {
         if (!do_move(move)) {
             continue;
         }
+
+        GAME.push(copy_board(BOARD));
+        GAME_HASH.push(copy_bitboard(hash_key));
+        if (GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 2) { // repitition
+            // Reset state
+            BOARD = cb;
+            CASTLE = cc;
+            GAMEPHASE = cg;
+            EN_PASSANT_SQUARE = copy_en;
+            TURN = copy_turn;
+            hash_key = copy_hash;
+            continue;
+        } 
         
         legal_moves++;
         ply++
         let eval = -best_eval(depth - 1, -beta, -alpha);
         ply--;
+
+        GAME.pop();
+        GAME_HASH.pop();
 
         // Reset state
         BOARD = cb;
