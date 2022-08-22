@@ -481,461 +481,6 @@ function do_move(move) {
     return true;
 }
 
-// HTML BOARD ----------------------------------------------------------------------------------------------------------------------
-
-function get_move_number() {
-    return (GAME_MOVES.length / 2 + 1) << 0;
-}
-
-function display_board() {
-    GAME.push(copy_board(BOARD));
-    GAME_HASH.push(copy_bitboard(hash_key));
-
-    let table = document.getElementById("chess-table");
-    for (let i = 0; i < 64; i++) {
-        let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
-        piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
-        piece_location.innerHTML = "";
-
-        if (get_bit(BOARD[14], i)) {
-            for (let j = 0; j < 12; j++) {
-                if (get_bit(BOARD[j], i)) {
-                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
-                    let piece = '<img draggable="false" style="width: 70px; height: 70px;" src="../chess_piece_images/' + (piece_number) + '.png">';
-                    piece_location.innerHTML = '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
-                    pieceDrag(document.getElementById((i)), i, false);
-                    break;
-                }
-            }
-        }
-    }
-}
-
-function highlightLastMove(last_move) {
-    let table = document.getElementById("chess-table");
-    let lcode = "#B8E2F2"; let dcode = "#77C3EC";
-
-    let move_source = get_move_source(last_move);
-    let move_target = get_move_target(last_move);
-
-    let s_location = table.rows.item(move_source / 8 >> 0).cells.item(move_source % 8 + 1);
-    let t_location = table.rows.item(move_target / 8 >> 0).cells.item(move_target % 8 + 1);
-
-    s_location.style.background = (s_location.className == "light") ? lcode : dcode;
-    t_location.style.background = (t_location.className == "light") ? lcode : dcode;
-}
-
-function doAiMove(differentAi=false) {
-    let res;
-    if (differentAi) { res = basicSearch(4); } 
-    else { res = search(LOOKAHEAD); }
-    let evaluation = res[0]; let time = res[1]; let moves = res[2];
-    let best_move = pv_table[0][0];
-
-    if (!do_move(best_move)) {
-        return finish();
-    }
-
-    // Print search details
-    document.getElementById("move_number").innerHTML = "Move number: " + (get_move_number() + PLAYER_WHITE);
-    document.getElementById("analysed").value = (COUNT);
-    document.getElementById("depth_input").value = (LOOKAHEAD);
-    document.getElementById("time").value = (time) + " ms";
-    document.getElementById("move").value = get_move_desc(best_move, moves);
-
-    if (PLAYER_WHITE) { 
-        evaluation *= -1;
-    }
-    GAME_MOVES.push(document.getElementById("move").value);
-
-    evaluation = Math.round(evaluation + Number.EPSILON);
-    if (evaluation < -99900) {
-        if (evaluation == -99999) { setTimeout(() => {  return finish(); }, 250); }
-        evaluation = "-M" + ((99999 + evaluation) / 2 << 0);
-    } else if (evaluation > 99900) {
-        if (evaluation == 99999) { setTimeout(() => {  return finish(); }, 250); }
-        evaluation = "M" + ((99999 - evaluation + 1) / 2 << 0);
-    } else { evaluation /= 100; }
-
-    document.getElementById("evaluation").value = evaluation;
-    showLines();         
-
-    if (!DISABLE_LOOKAHEAD && !differentAi) {
-        if (!time) {
-            // book move
-        } else if (time < 750) { // under 0.5s, INCREASE
-            LOOKAHEAD_COUNT = 2;
-        } else if (time < 1500) {
-            LOOKAHEAD_COUNT++;
-        } else if (time > 15000) { // over 15s, DECREASE
-            LOOKAHEAD_COUNT = -2;
-        } else if (time > 7500) {
-            LOOKAHEAD_COUNT--;
-        }
-
-        if (LOOKAHEAD_COUNT >= 2) { // 2 fast moves
-            LOOKAHEAD++;
-            LOOKAHEAD_COUNT = 0;
-        } else if (LOOKAHEAD_COUNT <= -2) { // 2 slow moves
-            LOOKAHEAD--;
-            LOOKAHEAD_COUNT = 0
-        }
-    }
-
-    let gamephase_score = get_gamephase_score();
-    if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
-    else if (gamephase_score < endgame_phase) { GAMEPHASE = 2; }
-    else { GAMEPHASE = 1; }
-
-    display_board();
-    highlightLastMove(best_move);
-}
-
-function doHumanMove() {
-    for (let i = 0; i < 64; i++) {
-        if (get_bit(BOARD[14], i)) {
-            for (let j = 0; j < 12; j++) {
-                if (get_bit(BOARD[j], i)) {
-                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
-                    let piece_white = piece_number < 6;
-                    pieceDrag(document.getElementById((i)), i, !(piece_white ^ PLAYER_WHITE));
-                    break;
-                }
-            }
-        }
-    }
-}
-
-let min_left = 34; let min_top = 14; let width = 84;
-let SELECTED_PIECE = 64;
-
-function pieceDrag(div, pos, pieceTurn) {
-    let pos1 = 0; let pos2 = 0; let pos3 = 0; let pos4 = 0;
-    setPosition();
-    if (pieceTurn) { div.onmousedown = openDragElement; }
-
-    function setPosition() {
-        let rem_top = (div.offsetTop - min_top) % width;
-        let rem_left = (div.offsetLeft - min_left) % width;
-        if (rem_top > width/2) {
-            rem_top -= width;
-        }
-        if (rem_left > width/2) {
-            rem_left -= width;
-        }
-        div.style.top = (div.offsetTop - rem_top) + "px";
-        div.style.left = (div.offsetLeft - rem_left) + "px";
-    }
-
-    function openDragElement(e) {
-        e = e || window.event;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-
-        // Reset board colours
-        let table = document.getElementById("chess-table");
-        for (let i = 0; i < 64; i++) {
-            let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
-            if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
-                piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
-            }
-            piece_location.onclick = null;
-        }
-
-        document.onmouseup = closeDragElement;
-        document.onmousemove = dragElement;
-    }
-
-    function dragElement(e) {
-        e = e || window.event;
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        div.style.top = (div.offsetTop - pos2) + "px";
-        div.style.left = (div.offsetLeft - pos1) + "px";
-    }
-
-    function closeDragElement(e) {
-        document.onmouseup = null;
-        document.onmousemove = null;
-        setPosition();
-
-        let new_row = (div.offsetTop - min_top) / width;
-        let new_col = (div.offsetLeft - min_left) / width;
-        let new_pos = 8 * new_row + new_col;
-
-        setPosition();
-
-        if (pos == new_pos) {
-            clickMovePiece();
-        } else {
-            if (!doLegalMove(new_pos)) { // reset piece position
-                div.style.top = ((pos / 8 << 0) * width + min_top) + "px";
-                div.style.left = ((pos % 8) * width + min_left) + "px";
-            }
-        }
-    }
-
-    function clickMovePiece() {
-        let table = document.getElementById("chess-table");
-
-        if (SELECTED_PIECE == pos) { return; } // remove selection
-
-         // Highlight piece
-         let piece_location = table.rows.item(pos / 8 >> 0).cells.item(pos % 8 + 1);
-         piece_location.style.background = (piece_location.className == "light") ? "#bbe0ae" : "#75c15b";
-
-        // Determine legal piece moves
-        let moves = generate_pseudo_moves();
-        let move_targets = [];
-        for (let i = 0; i < moves.length; i++) {
-            if (get_move_source(moves[i]) == pos) {
-                move_targets.push(get_move_target(moves[i]));
-            }
-        }
-
-        // Add onclick for doing nothing
-        for (let i = 0; i < 64; i++) {
-            let cell = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
-            if (i == pos) { continue; }
-            cell.onclick = function() {
-                SELECTED_PIECE = 64;
-                if (get_bit(BOARD[14], i)) { SELECTED_PIECE = i; }
-                // Reset board colours
-                for (let j = 0; j < 64; j++) {
-                    let piece_location = table.rows.item(j / 8 >> 0).cells.item(j % 8 + 1);
-                    if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
-                        piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
-                    }
-                    piece_location.onclick = null;
-                }
-            }
-        }
-
-        // Add onclick for legal piece moves
-        for (let i = 0; i < move_targets.length; i++) {
-            let target = move_targets[i];
-            let move_location = table.rows.item(target / 8 >> 0).cells.item(target % 8 + 1);
-
-            move_location.onclick = function() {
-                SELECTED_PIECE = 64;
-                doLegalMove(target);
-            }
-        }
-    }
-
-    function doLegalMove(target) {
-        let res = legal_move(pos, target);
-        let moves = res[0]; let move = res[1];
-        if (move) {
-            if (get_move_promote(move)) { // ask for promote input
-                move |= 983040; // set promote 15
-            }
-            if (do_move(move)) {
-                GAME_MOVES.push(get_move_desc(move, moves));
-
-                let message = "LOADING";
-                let res = "";
-                for (let i = 0; i < message.length; i++) {
-                    res += "<h1>" + message[i] + "</h1><br>";
-                }
-                document.getElementById("loading").innerHTML = res.slice(0, res.length - 4);
-                
-                setTimeout(() => {  
-
-                    document.getElementById("loading").innerHTML = "";
-                    display_board(move); 
-                    doAiMove();
-                    doHumanMove();
-
-                }, 250);
-                return true;
-            }
-            let king_pos = TURN ? lsb_index(BOARD[11]) : lsb_index(BOARD[5]);
-            let king_location = document.getElementById("chess-table").rows.item(king_pos / 8 >> 0).cells.item(king_pos % 8 + 1);
-            king_location.style.background = "#FF0000"; // RED
-            setTimeout(() => {
-                king_location.style.background = (king_location.className == "light") ? "#f1d9c0" : "#a97a65";
-            }, 250);
-        }
-        return false;
-    }
-}
-
-// INITIALISE BOARD ----------------------------------------------------------------------------------------------------------------------
-
-function make_table(player_white) {
-    let table = '<table id="chess-table" class="chess-board">';
-    for (let row = 0; row < 8; row++) {
-        if (player_white) {
-            table += '<tr><th>' + (8 - row).toString() + '</th>'; 
-        } else {
-            table += '<tr><th>' + (row + 1).toString() + '</th>';  
-        }
-        for (let col = 0; col < 8; col++) {
-            if ((row + col) % 2 == 1) {
-                colour_class = 'dark';    
-            } else {
-                colour_class = 'light';
-            }
-            table += '<td class="' + colour_class + '"></td>';
-        }
-        table += '</tr>';
-    }
-    if (player_white) {
-        table += '<th></th><th>a</th><th>b</th><th>c</th><th>d</th><th>e</th><th>f</th><th>g</th><th>h</th></table>';
-    } else {
-        table += '<th></th><th>h</th><th>g</th><th>f</th><th>e</th><th>d</th><th>c</th><th>b</th><th>a</th></table>';
-    }
-
-    document.getElementById("chess-board").innerHTML = table;
-}
-
-function flip_fen(fen) {
-    let res = "";
-    let i = 0;
-    while (i < fen.length) {
-        let row = "";
-        while (i < fen.length && fen[i] != "/" && fen[i] != " ") {
-            row += fen[i];
-            i++;
-        }
-        let rev_row = "";
-        for (let j = row.length - 1; j >= 0; j--) {
-            rev_row += row[j];
-        }
-        res = rev_row + res;
-        if (fen[i] == " ") {
-            // fen = "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4";
-            res += " " + fen[i + 1] + " ";
-            if (fen[i + 3] != "-") {
-                while (fen[i + 3] != " ") {
-                    res += fen[i + 3];
-                    i++;
-                }
-            } else { res += "-"; }
-            res += " ";
-            if (fen[i + 4] != "-") {
-                let letters = {"a": "h", "b": "g", "c": "f", "d": "e", "f": "c", "g": "b", "h": "a"};
-                res += letters[fen[i + 4]];
-                let new_num = 9 - parseInt(fen[i + 5]);
-                res += new_num.toString();
-            } else { res += "-"; }
-            res += " " + fen[fen.length - 3] + " " + fen[fen.length - 1];
-            return res;
-        } else {
-            res = fen[i] + res;
-        }
-        i++;
-    } 
-    return res;
-}
-
-function make_board(fen) {
-    function asList(array) {
-        let res = [];
-        for (let i = 0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-                res.push(array[i][j]);
-            }
-        }
-        return res;
-    }
-    let values;
-    if (PLAYER_WHITE) {
-        values = {
-            P: 1,
-            R: 2,
-            N: 3,
-            B: 4,
-            Q: 5,
-            K: 6,
-    
-            p: 7,
-            r: 8,
-            n: 9,
-            b: 10,
-            q: 11,
-            k: 12,                   
-        }
-    } else {
-        values = {
-            P: 7,
-            R: 8,
-            N: 9,
-            B: 10,
-            Q: 11,
-            K: 12,
-    
-            p: 1,
-            r: 2,
-            n: 3,
-            b: 4,
-            q: 5,
-            k: 6,                   
-        }
-        fen = flip_fen(fen);
-    }
-
-    let res = new Array(8);
-    for (let i = 0; i < 8; i++) {
-        res[i] = new Array(8).fill(0);
-    }
-
-    let curr_row = 0;
-    let curr_col = 0;
-
-    for (let i = 0; i < fen.length; i++) {
-        let char = fen[i];
-        if (char == " ") {
-            let castle = [0, 0, 0, 0];
-            let j = 3;
-            while (fen[i + j] != " ") {
-                if (fen[i + j] == "K") {
-                    castle[0] = 1;
-                } else if (fen[i + j] == "Q") {
-                    castle[1] = 1;
-                } else if (fen[i + j] == "k") {
-                    castle[2] = 1;
-                } else if (fen[i + j] == "q") {
-                    castle[3] = 1;
-                }
-                j++;
-            }
-            if (fen[i + j + 1] != "-") {
-                EN_PASSANT_SQUARE = 8 * (8 - parseInt(fen[i + j + 2])) + fen[i + j + 1].charCodeAt() - 97;
-                if (!PLAYER_WHITE) {
-                    EN_PASSANT_SQUARE = 63 - EN_PASSANT_SQUARE;
-                }
-            }
-
-            TURN = fen[i + 1] == "w" ? 0 : 1;
-
-            if (!PLAYER_WHITE) {
-                TURN ^= 1;
-                let temp = castle[0];
-                castle[0] = castle[2];
-                castle[2] = temp;
-                temp = castle[1];
-                castle[1] = castle[3];
-                castle[3] = temp;
-            }
-            CASTLE = create_castle(castle);
-            return create_board(asList(res));
-
-        } else if (char == "/") {
-            curr_row++;
-            curr_col = 0;
-        } else if (!isNaN(char)) {
-            curr_col += parseInt(char);
-        } else {
-            res[curr_row][curr_col] = values[char];
-            curr_col++;
-        }
-    }
-}
-
 // DEFINE MOVES ----------------------------------------------------------------------------------------------------------------------
 
 function initialiseConstants() {   
@@ -1322,6 +867,464 @@ function finish() {
     // TURN = 2; // prevent moving pieces
 }
 
+// HTML BOARD ----------------------------------------------------------------------------------------------------------------------
+
+function get_move_number() {
+    return (GAME_MOVES.length / 2 + 1) << 0;
+}
+
+function display_board() {
+    GAME.push(copy_board(BOARD));
+    GAME_HASH.push(copy_bitboard(hash_key));
+
+    let table = document.getElementById("chess-table");
+    for (let i = 0; i < 64; i++) {
+        let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
+        piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
+        piece_location.innerHTML = "";
+
+        if (get_bit(BOARD[14], i)) {
+            for (let j = 0; j < 12; j++) {
+                if (get_bit(BOARD[j], i)) {
+                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
+                    let piece = '<img draggable="false" style="width: 70px; height: 70px;" src="../chess_piece_images/' + (piece_number) + '.png">';
+                    piece_location.innerHTML = '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
+                    pieceDrag(document.getElementById((i)), i, false);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+function highlightLastMove(last_move) {
+    let table = document.getElementById("chess-table");
+    let lcode = "#B8E2F2"; let dcode = "#77C3EC";
+
+    let move_source = get_move_source(last_move);
+    let move_target = get_move_target(last_move);
+
+    let s_location = table.rows.item(move_source / 8 >> 0).cells.item(move_source % 8 + 1);
+    let t_location = table.rows.item(move_target / 8 >> 0).cells.item(move_target % 8 + 1);
+
+    s_location.style.background = (s_location.className == "light") ? lcode : dcode;
+    t_location.style.background = (t_location.className == "light") ? lcode : dcode;
+}
+
+function doAiMove(differentAi=false) {
+    let res;
+    if (differentAi) { res = basicSearch(4); } 
+    else { res = search(LOOKAHEAD); }
+    let evaluation = res[0]; let time = res[1]; let moves = res[2];
+    let best_move = pv_table[0][0];
+
+    if (!do_move(best_move)) {
+        finish();
+        return false;
+    }
+
+    // Print search details
+    document.getElementById("move_number").innerHTML = "Move number: " + (get_move_number() + PLAYER_WHITE);
+    document.getElementById("analysed").value = (COUNT);
+    document.getElementById("depth_input").value = (LOOKAHEAD);
+    document.getElementById("time").value = (time) + " ms";
+    document.getElementById("move").value = get_move_desc(best_move, moves);
+
+    if (PLAYER_WHITE) { 
+        evaluation *= -1;
+    }
+    GAME_MOVES.push(document.getElementById("move").value);
+
+    evaluation = Math.round(evaluation + Number.EPSILON);
+    if (evaluation < -99900) {
+        if (evaluation == -99999) { setTimeout(() => {  return finish(); }, 250); }
+        evaluation = "-M" + ((99999 + evaluation) / 2 << 0);
+    } else if (evaluation > 99900) {
+        if (evaluation == 99999) { setTimeout(() => {  return finish(); }, 250); }
+        evaluation = "M" + ((99999 - evaluation + 1) / 2 << 0);
+    } else { evaluation /= 100; }
+
+    document.getElementById("evaluation").value = evaluation;
+    showLines();         
+
+    if (!DISABLE_LOOKAHEAD && !differentAi) {
+        if (!time) {
+            // book move
+        } else if (time < 750) { // under 0.5s, INCREASE
+            LOOKAHEAD_COUNT = 2;
+        } else if (time < 1500) {
+            LOOKAHEAD_COUNT++;
+        } else if (time > 15000) { // over 15s, DECREASE
+            LOOKAHEAD_COUNT = -2;
+        } else if (time > 7500) {
+            LOOKAHEAD_COUNT--;
+        }
+
+        if (LOOKAHEAD_COUNT >= 2) { // 2 fast moves
+            LOOKAHEAD++;
+            LOOKAHEAD_COUNT = 0;
+        } else if (LOOKAHEAD_COUNT <= -2) { // 2 slow moves
+            LOOKAHEAD--;
+            LOOKAHEAD_COUNT = 0
+        }
+    }
+
+    let gamephase_score = get_gamephase_score();
+    if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
+    else if (gamephase_score < endgame_phase) { GAMEPHASE = 2; }
+    else { GAMEPHASE = 1; }
+
+    display_board();
+    highlightLastMove(best_move);
+
+    return true;
+}
+
+function doHumanMove() {
+    for (let i = 0; i < 64; i++) {
+        if (get_bit(BOARD[14], i)) {
+            for (let j = 0; j < 12; j++) {
+                if (get_bit(BOARD[j], i)) {
+                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
+                    let piece_white = piece_number < 6;
+                    pieceDrag(document.getElementById((i)), i, !(piece_white ^ PLAYER_WHITE));
+                    break;
+                }
+            }
+        }
+    }
+}
+
+let min_left = 34; let min_top = 14; let width = 84;
+let SELECTED_PIECE = 64;
+
+function pieceDrag(div, pos, pieceTurn) {
+    let pos1 = 0; let pos2 = 0; let pos3 = 0; let pos4 = 0;
+    setPosition();
+    if (pieceTurn) { div.onmousedown = openDragElement; }
+
+    function setPosition() {
+        let rem_top = (div.offsetTop - min_top) % width;
+        let rem_left = (div.offsetLeft - min_left) % width;
+        if (rem_top > width/2) {
+            rem_top -= width;
+        }
+        if (rem_left > width/2) {
+            rem_left -= width;
+        }
+        div.style.top = (div.offsetTop - rem_top) + "px";
+        div.style.left = (div.offsetLeft - rem_left) + "px";
+    }
+
+    function openDragElement(e) {
+        e = e || window.event;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+
+        // Reset board colours
+        let table = document.getElementById("chess-table");
+        for (let i = 0; i < 64; i++) {
+            let piece_location = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
+            if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
+                piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
+            }
+            piece_location.onclick = null;
+        }
+
+        document.onmouseup = closeDragElement;
+        document.onmousemove = dragElement;
+    }
+
+    function dragElement(e) {
+        e = e || window.event;
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        div.style.top = (div.offsetTop - pos2) + "px";
+        div.style.left = (div.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement(e) {
+        document.onmouseup = null;
+        document.onmousemove = null;
+        setPosition();
+
+        let new_row = (div.offsetTop - min_top) / width;
+        let new_col = (div.offsetLeft - min_left) / width;
+        let new_pos = 8 * new_row + new_col;
+
+        setPosition();
+
+        if (pos == new_pos) {
+            clickMovePiece();
+        } else {
+            if (!doLegalMove(new_pos)) { // reset piece position
+                div.style.top = ((pos / 8 << 0) * width + min_top) + "px";
+                div.style.left = ((pos % 8) * width + min_left) + "px";
+            }
+        }
+    }
+
+    function clickMovePiece() {
+        let table = document.getElementById("chess-table");
+
+        if (SELECTED_PIECE == pos) { return; } // remove selection
+
+         // Highlight piece
+         let piece_location = table.rows.item(pos / 8 >> 0).cells.item(pos % 8 + 1);
+         piece_location.style.background = (piece_location.className == "light") ? "#bbe0ae" : "#75c15b";
+
+        // Determine legal piece moves
+        let moves = generate_pseudo_moves();
+        let move_targets = [];
+        for (let i = 0; i < moves.length; i++) {
+            if (get_move_source(moves[i]) == pos) {
+                move_targets.push(get_move_target(moves[i]));
+            }
+        }
+
+        // Add onclick for doing nothing
+        for (let i = 0; i < 64; i++) {
+            let cell = table.rows.item(i / 8 >> 0).cells.item(i % 8 + 1);
+            if (i == pos) { continue; }
+            cell.onclick = function() {
+                SELECTED_PIECE = 64;
+                if (get_bit(BOARD[14], i)) { SELECTED_PIECE = i; }
+                // Reset board colours
+                for (let j = 0; j < 64; j++) {
+                    let piece_location = table.rows.item(j / 8 >> 0).cells.item(j % 8 + 1);
+                    if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
+                        piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
+                    }
+                    piece_location.onclick = null;
+                }
+            }
+        }
+
+        // Add onclick for legal piece moves
+        for (let i = 0; i < move_targets.length; i++) {
+            let target = move_targets[i];
+            let move_location = table.rows.item(target / 8 >> 0).cells.item(target % 8 + 1);
+
+            move_location.onclick = function() {
+                SELECTED_PIECE = 64;
+                doLegalMove(target);
+            }
+        }
+    }
+
+    function doLegalMove(target) {
+        let res = legal_move(pos, target);
+        let moves = res[0]; let move = res[1];
+        if (move) {
+            if (get_move_promote(move)) { // ask for promote input
+                move |= 983040; // set promote 15
+            }
+            if (do_move(move)) {
+                GAME_MOVES.push(get_move_desc(move, moves));
+
+                let message = "LOADING";
+                let res = "";
+                for (let i = 0; i < message.length; i++) {
+                    res += "<h1>" + message[i] + "</h1><br>";
+                }
+                document.getElementById("loading").innerHTML = res.slice(0, res.length - 4);
+                
+                setTimeout(() => {  
+
+                    document.getElementById("loading").innerHTML = "";
+                    display_board(move); 
+                    doAiMove();
+                    doHumanMove();
+
+                }, 250);
+                return true;
+            }
+            let king_pos = TURN ? lsb_index(BOARD[11]) : lsb_index(BOARD[5]);
+            let king_location = document.getElementById("chess-table").rows.item(king_pos / 8 >> 0).cells.item(king_pos % 8 + 1);
+            king_location.style.background = "#FF0000"; // RED
+            setTimeout(() => {
+                king_location.style.background = (king_location.className == "light") ? "#f1d9c0" : "#a97a65";
+            }, 250);
+        }
+        return false;
+    }
+}
+
+// INITIALISE BOARD ----------------------------------------------------------------------------------------------------------------------
+
+function make_table(player_white) {
+    let table = '<table id="chess-table" class="chess-board">';
+    for (let row = 0; row < 8; row++) {
+        if (player_white) {
+            table += '<tr><th>' + (8 - row).toString() + '</th>'; 
+        } else {
+            table += '<tr><th>' + (row + 1).toString() + '</th>';  
+        }
+        for (let col = 0; col < 8; col++) {
+            if ((row + col) % 2 == 1) {
+                colour_class = 'dark';    
+            } else {
+                colour_class = 'light';
+            }
+            table += '<td class="' + colour_class + '"></td>';
+        }
+        table += '</tr>';
+    }
+    if (player_white) {
+        table += '<th></th><th>a</th><th>b</th><th>c</th><th>d</th><th>e</th><th>f</th><th>g</th><th>h</th></table>';
+    } else {
+        table += '<th></th><th>h</th><th>g</th><th>f</th><th>e</th><th>d</th><th>c</th><th>b</th><th>a</th></table>';
+    }
+
+    document.getElementById("chess-board").innerHTML = table;
+}
+
+function flip_fen(fen) {
+    let res = "";
+    let i = 0;
+    while (i < fen.length) {
+        let row = "";
+        while (i < fen.length && fen[i] != "/" && fen[i] != " ") {
+            row += fen[i];
+            i++;
+        }
+        let rev_row = "";
+        for (let j = row.length - 1; j >= 0; j--) {
+            rev_row += row[j];
+        }
+        res = rev_row + res;
+        if (fen[i] == " ") {
+            // fen = "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4";
+            res += " " + fen[i + 1] + " ";
+            if (fen[i + 3] != "-") {
+                while (fen[i + 3] != " ") {
+                    res += fen[i + 3];
+                    i++;
+                }
+            } else { res += "-"; }
+            res += " ";
+            if (fen[i + 4] != "-") {
+                let letters = {"a": "h", "b": "g", "c": "f", "d": "e", "f": "c", "g": "b", "h": "a"};
+                res += letters[fen[i + 4]];
+                let new_num = 9 - parseInt(fen[i + 5]);
+                res += new_num.toString();
+            } else { res += "-"; }
+            res += " " + fen[fen.length - 3] + " " + fen[fen.length - 1];
+            return res;
+        } else {
+            res = fen[i] + res;
+        }
+        i++;
+    } 
+    return res;
+}
+
+function make_board(fen) {
+    function asList(array) {
+        let res = [];
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                res.push(array[i][j]);
+            }
+        }
+        return res;
+    }
+    let values;
+    if (PLAYER_WHITE) {
+        values = {
+            P: 1,
+            R: 2,
+            N: 3,
+            B: 4,
+            Q: 5,
+            K: 6,
+    
+            p: 7,
+            r: 8,
+            n: 9,
+            b: 10,
+            q: 11,
+            k: 12,                   
+        }
+    } else {
+        values = {
+            P: 7,
+            R: 8,
+            N: 9,
+            B: 10,
+            Q: 11,
+            K: 12,
+    
+            p: 1,
+            r: 2,
+            n: 3,
+            b: 4,
+            q: 5,
+            k: 6,                   
+        }
+        fen = flip_fen(fen);
+    }
+
+    let res = new Array(8);
+    for (let i = 0; i < 8; i++) {
+        res[i] = new Array(8).fill(0);
+    }
+
+    let curr_row = 0;
+    let curr_col = 0;
+
+    for (let i = 0; i < fen.length; i++) {
+        let char = fen[i];
+        if (char == " ") {
+            let castle = [0, 0, 0, 0];
+            let j = 3;
+            while (fen[i + j] != " ") {
+                if (fen[i + j] == "K") {
+                    castle[0] = 1;
+                } else if (fen[i + j] == "Q") {
+                    castle[1] = 1;
+                } else if (fen[i + j] == "k") {
+                    castle[2] = 1;
+                } else if (fen[i + j] == "q") {
+                    castle[3] = 1;
+                }
+                j++;
+            }
+            if (fen[i + j + 1] != "-") {
+                EN_PASSANT_SQUARE = 8 * (8 - parseInt(fen[i + j + 2])) + fen[i + j + 1].charCodeAt() - 97;
+                if (!PLAYER_WHITE) {
+                    EN_PASSANT_SQUARE = 63 - EN_PASSANT_SQUARE;
+                }
+            }
+
+            TURN = fen[i + 1] == "w" ? 0 : 1;
+
+            if (!PLAYER_WHITE) {
+                TURN ^= 1;
+                let temp = castle[0];
+                castle[0] = castle[2];
+                castle[2] = temp;
+                temp = castle[1];
+                castle[1] = castle[3];
+                castle[3] = temp;
+            }
+            CASTLE = create_castle(castle);
+            return create_board(asList(res));
+
+        } else if (char == "/") {
+            curr_row++;
+            curr_col = 0;
+        } else if (!isNaN(char)) {
+            curr_col += parseInt(char);
+        } else {
+            res[curr_row][curr_col] = values[char];
+            curr_col++;
+        }
+    }
+}
+
 // HTML FEATURES ----------------------------------------------------------------------------------------------------------------------
 
 function undo_move() {
@@ -1556,13 +1559,11 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     display_board();
 
     if (aiGame) {
-        let moves = 0;
-        while (moves < 60) {
-            doAiMove();
+        while (true) {
+            if (!doAiMove()) { return; }
             await delay(0.5);
-            doAiMove(true);
+            if (!doAiMove(true)) { return; }
             await delay(0.5);
-            moves++;
         }
     } else {
         if (!PLAYER_WHITE) {

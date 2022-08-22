@@ -830,7 +830,13 @@ function best_eval_captures(alpha, beta, depth) {
     return alpha;
 }
 
+function is_repetition() {
+    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 2;
+}
+
 function best_eval(depth, alpha, beta) {
+    if (is_repetition()) { return 0; } 
+
     let score = HASH_TABLE.get(depth, alpha, beta);
     if (ply && score != null) {
         LOOKUP++;
@@ -851,7 +857,7 @@ function best_eval(depth, alpha, beta) {
         enable_pv_scoring(moves);
     }
 
-    moves = order_moves(moves); // SECOND ARGUMENT RATES CHECKS HIGHER
+    moves = order_moves(moves);
     let legal_moves = 0; let hash_flag = 2;
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
@@ -871,16 +877,6 @@ function best_eval(depth, alpha, beta) {
 
         GAME.push(copy_board(BOARD));
         GAME_HASH.push(copy_bitboard(hash_key));
-        if (GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 2) { // repitition
-            // Reset state
-            BOARD = cb;
-            CASTLE = cc;
-            GAMEPHASE = cg;
-            EN_PASSANT_SQUARE = copy_en;
-            TURN = copy_turn;
-            hash_key = copy_hash;
-            continue;
-        } 
         
         legal_moves++;
         ply++
