@@ -1030,7 +1030,7 @@ function doHumanMove() {
     }
 }
 
-let min_left = 34; let min_top = 14; let width = 84;
+let min_left = 34 + 150; let min_top = 14; let width = 84;
 let SELECTED_PIECE = 64;
 
 function pieceDrag(div, pos, pieceTurn) {
@@ -1473,7 +1473,7 @@ function get_fen() {
 }
 
 function play_rand_endgame(number) {
-    ENGAMES = [
+    let endgames = [
         ["6k1/5p2/6p1/8/7p/8/6PP/6K1 b - - 0 0", "Black"], // 3p vs 2p
         ["3k4/2n2B2/1KP5/2B2p2/5b1p/7P/8/8 b - - 0 0", "White"], // 2B vs BN
         ["4R3/1k6/1p2P1p1/p7/4r3/1P1r4/1K6/2R5 w - - 0 0", "Equal"], // 2R vs 2R
@@ -1503,14 +1503,10 @@ function play_rand_endgame(number) {
         ["8/8/1p1k4/5ppp/PPK1p3/6P1/5PP1/8 b - - 0 0", "Black"] // K+P
     ]
     let index = number - 1;
-    if (!index || index >= ENGAMES.length) {
-        index = Math.floor(Math.random() * ENGAMES.length);
-    } 
+    if (!index || index >= endgames.length) { index = Math.floor(Math.random() * endgames.length); } 
     console.log("ENDGAME INDEX: " + (index));
-    let fen = ENGAMES[index][0];
-    document.getElementById("endgame_winning").value = (index + 1) + ": " + (ENGAMES[index][1]);
-
-    // document.getElementById("endgame_winning").innerHTML = '<h4 style="text-align: center;">' + ENGAMES[index][1] + '</h4>';
+    let fen = endgames[index][0];
+    document.getElementById("endgame_winning").value = (index + 1) + ": " + (endgames[index][1]);
 
     i = 0;
     while (i < fen.length) {
@@ -1525,16 +1521,19 @@ function play_rand_endgame(number) {
 }
 
 function load_endgame() {
-    play_rand_endgame(parseInt(document.getElementById("endgame_number").value))
+    let value = parseInt(document.getElementById("endgame_number").value);
+    play_rand_endgame(value);
 }
 
 function play_book_endgame() {
-    ENGAMES = [
+    let endgames = [
         "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0", // BN vs K
     ]
-    let index = Math.floor(Math.random() * ENGAMES.length);
+    let index = parseInt(document.getElementById("book_endgame").value);
+    if (!index || index >= endgames.length) { index = Math.floor(Math.random() * endgames.length); }
+    
     console.log("ENDGAME INDEX: " + (index));
-    let fen = ENGAMES[index];
+    let fen = endgames[index];
     i = 0;
     while (i < fen.length) {
         if (fen[i] == " ") {
@@ -1552,7 +1551,6 @@ function showLines() {
     if (document.getElementById("lineCheckbox").checked) {
         for (let i = 1; i < pv_length[0]; i++) {
             res += get_move_desc(pv_table[0][i]) + " ";
-            if (res.length > 30) { break; }
         }
     }
     document.getElementById("lines").value = res;
@@ -1572,6 +1570,8 @@ function set_gamephase() {
 }
 
 async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
+    let temp = document.getElementById("fen").value;
+    if (temp) { fen = temp; }
     if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
     DISABLE_LOOKAHEAD = false;
     GAME = [];
@@ -1593,6 +1593,9 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
 
     display_board();
 
+    console.log(TURN);
+    console.log(PLAYER_WHITE);
+
     if (aiGame) {
         while (true) {
             if (!doAiMove()) { return; }
@@ -1601,7 +1604,7 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
             await delay(0.5);
         }
     } else {
-        if (!PLAYER_WHITE) {
+        if (TURN) {
             doAiMove();
         }
         doHumanMove();
