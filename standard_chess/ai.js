@@ -732,21 +732,42 @@ function score_move(move) { // IMPORTANT
         return 20000; // was determined best move in prev search
     }
 
+    let source = get_move_source(move);
     let target = get_move_target(move); 
     let piece = get_move_piece(move);
+    let piece_type = piece % 6;
 
     if (get_move_capture(move)) {
         for (let i = 6 * (1 - TURN); i < 6 * (1 - TURN) + 6; i++) {
             if (get_bit(BOARD[i], target)) {
-                return 10005 - piece % 6 + 100 * (i % 6 + 1); // + capture_val(piece, i);
+                return 10005 - piece_type + 100 * (i % 6 + 1); // + capture_val(piece, i);
             }
         }
         // En passant
         return 10105;
-    } else {
-        if (move == killer_moves[0][ply]) { return 9000; }
-        else if (move == killer_moves[1][ply]) { return 8000; }
-        else { return history_moves[piece][target]; }
+    }
+    if (move == killer_moves[0][ply]) { return 9000; }
+    else if (move == killer_moves[1][ply]) { return 8000; }
+    else { 
+        let res = history_moves[piece][target]; 
+
+        // Encourage moving away from attacked square
+        let threatened_by_pawn = (!TURN && bool_bitboard(and_bitboards(PAWN_ATTACK[1][source], BOARD[0]))) || (TURN && bool_bitboard(and_bitboards(PAWN_ATTACK[0][source], BOARD[6])));
+        let threatened_by_minor = (bool_bitboard(and_bitboards(KNIGHT_ATTACK[source], TURN ? BOARD[8] : BOARD[2]))) || (get_bit(bishop_attack(TURN), source));
+        let threatened_by_rook = get_bit(rook_attack(TURN), source);
+
+        if (piece_type > 0 && threatened_by_pawn) { res += 3 * piece_type; }
+        else if ((piece_type == 1 || piece_type == 4) && threatened_by_minor) { res += 2 * piece_type; }
+        else if (piece_type == 4 && threatened_by_rook) { res += piece_type; }
+
+        // // Discourage moving to attacked square
+        // let target_attacked = is_square_attacked(target, TURN ^ 1);
+        // if (target_attacked) {
+        //     target_attacked--;
+        //     res -= 100 * Math.max(piece % 6 - target_attacked % 6, 0);
+        // }
+
+        return res;
     }
 }
 
@@ -846,7 +867,7 @@ function best_eval(depth, alpha, beta) {
     let found_pv = 0;
     pv_length[ply] = ply;
 
-    if (depth == 0) { return best_eval_captures(alpha, beta, 50); }
+    if (depth == 0) { return best_eval_captures(alpha, beta, 8); }
     if (ply >= MAX_PLY) { return evaluate_board(); }
 
     COUNT++;

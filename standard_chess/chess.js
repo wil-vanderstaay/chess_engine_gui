@@ -1460,7 +1460,7 @@ function get_fen() {
         i += direction;
     }
 
-    res = res.slice(0, res.length - 1) + " " + (PLAYER_WHITE ? "w" : "b") + " " + castle + " " + en_pass + " 0 1";
+    res = res.slice(0, res.length - 1) + " " + (PLAYER_WHITE ^ TURN ? "w" : "b") + " " + castle + " " + en_pass + " 0 1";
 
     let dummy = document.createElement("textarea");
     document.body.appendChild(dummy);
@@ -1572,7 +1572,7 @@ function set_gamephase() {
 async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
     let temp = document.getElementById("fen").value;
     if (temp) { fen = temp; }
-    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
+    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; } 
     DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_HASH = [];
@@ -1592,9 +1592,6 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     set_gamephase();
 
     display_board();
-
-    console.log(TURN);
-    console.log(PLAYER_WHITE);
 
     if (aiGame) {
         while (true) {
