@@ -43,7 +43,7 @@ function get_move_desc(move, all_moves) { // all_moves for specific desc, eg. Nb
         return "O-O-O";
     }
 
-    let pieces = ["", "R", "N", "B", "Q", "K", "", "R", "N", "B", "Q", "K"];
+    let pieces = ["", "N", "B", "R", "Q", "K", "", "N", "B", "R", "Q", "K"];
     let letters = "abcdefgh";
     let srow = move_source / 8 >> 0; let scol = move_source % 8;
     let trow = move_target / 8 >> 0; let tcol = move_target % 8;
@@ -294,11 +294,11 @@ function print_board(board) {
                     if (get_bit(board[0], k)) {
                         char = "p";
                     } else if (get_bit(board[1], k)) {
-                        char = "r";
-                    } else if (get_bit(board[2], k)) {
                         char = "n";
-                    } else if (get_bit(board[3], k)) {
+                    } else if (get_bit(board[2], k)) {
                         char = "b";
+                    } else if (get_bit(board[3], k)) {
+                        char = "r";
                     } else if (get_bit(board[4], k)) {
                         char = "q";
                     } else if (get_bit(board[5], k)) {
@@ -311,11 +311,11 @@ function print_board(board) {
                     if (get_bit(board[6], k)) {
                         char = "p";
                     } else if (get_bit(board[7], k)) {
-                        char = "r";
-                    } else if (get_bit(board[8], k)) {
                         char = "n";
-                    } else if (get_bit(board[9], k)) {
+                    } else if (get_bit(board[8], k)) {
                         char = "b";
+                    } else if (get_bit(board[9], k)) {
+                        char = "r";
                     } else if (get_bit(board[10], k)) {
                         char = "q";
                     } else if (get_bit(board[11], k)) {
@@ -365,8 +365,8 @@ function do_move(move) {
     if (get_move_promote(move)) {
         let promote_piece = get_move_promote(move);
         if (promote_piece == 15) {
-            let input = window.prompt("R N B Q: ").toUpperCase();
-            let value = { "R": 1, "N": 2, "B": 3, "Q": 4 };
+            let input = window.prompt("N B R Q: ").toUpperCase();
+            let value = { "N": 1, "B": 2, "R": 3, "Q": 4 };
             if (!Object.keys(value).includes(input)) { input = "Q"; }
             promote_piece = piece + value[input];
         }
@@ -388,55 +388,55 @@ function do_move(move) {
         if (PLAYER_WHITE) {
             switch(target) {
                 case 62: // pk
-                    pop_bit(BOARD[1], 63);
-                    set_bit(BOARD[1], 61);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[63][1]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[61][1]);
+                    pop_bit(BOARD[3], 63);
+                    set_bit(BOARD[3], 61);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[63][3]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[61][3]);
                     break;
                 case 58: // pq
-                    pop_bit(BOARD[1], 56);
-                    set_bit(BOARD[1], 59);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[56][1]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[59][1]);
+                    pop_bit(BOARD[3], 56);
+                    set_bit(BOARD[3], 59);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[56][3]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[59][3]);
                     break;
                 case 6: // ak
-                    pop_bit(BOARD[7], 7);
-                    set_bit(BOARD[7], 5);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[7][7]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[5][7]);
+                    pop_bit(BOARD[9], 7);
+                    set_bit(BOARD[9], 5);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[7][9]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[5][9]);
                     break;
                 case 2: // aq
-                    pop_bit(BOARD[7], 0);
-                    set_bit(BOARD[7], 3);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[0][7]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[3][7]);
+                    pop_bit(BOARD[9], 0);
+                    set_bit(BOARD[9], 3);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[0][9]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[3][9]);
                     break;
             }
         } else {
             switch(target) {
                 case 57: // pk
-                    pop_bit(BOARD[1], 56);
-                    set_bit(BOARD[1], 58);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[56][1]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[58][1]);
+                    pop_bit(BOARD[3], 56);
+                    set_bit(BOARD[3], 58);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[56][3]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[58][3]);
                     break;
                 case 61: // pq
-                    pop_bit(BOARD[1], 63);
-                    set_bit(BOARD[1], 60);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[63][1]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[60][1]);
+                    pop_bit(BOARD[3], 63);
+                    set_bit(BOARD[3], 60);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[63][3]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[60][3]);
                     break;
                 case 1: // ak
-                    pop_bit(BOARD[7], 0);
-                    set_bit(BOARD[7], 2);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[0][7]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[2][7]);
+                    pop_bit(BOARD[9], 0);
+                    set_bit(BOARD[9], 2);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[0][9]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[2][9]);
                     break;
                 case 5: // aq
-                    pop_bit(BOARD[7], 7);
-                    set_bit(BOARD[7], 4);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[7][7]);
-                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[4][7]);
+                    pop_bit(BOARD[9], 7);
+                    set_bit(BOARD[9], 4);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[7][9]);
+                    hash_key = xor_bitboards(hash_key, ZOB_TABLE[4][9]);
                     break;
             }
         }
@@ -469,7 +469,7 @@ function do_move(move) {
     BOARD[14] = or_bitboards(BOARD[12], BOARD[13]); // board
 
     // Moving into check, reset state
-    if (is_square_attacked(TURN ? lsb_index(BOARD[11]) : lsb_index(BOARD[5]), TURN ^ 1)) {
+    if (is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
         BOARD = cb;
         CASTLE = cc;
         EN_PASSANT_SQUARE = ce;
@@ -552,35 +552,6 @@ function initialiseConstants() {
     }
 }
 
-function rook_attack_fly(square, blocker) {
-    let res = [0, 0];
-    let r = square / 8 >> 0; let c = square % 8;
-    let o = 1;
-    while (r + o < 8) { // + .
-        let i = 8 * r + 8 * o + c;
-        set_bit(res, i); o++;
-        if (get_bit(blocker, i)) { break; }
-    }
-    o = 1;
-    while (0 <= r - o) { // - .
-        let i = 8 * r - 8 * o + c;
-        set_bit(res, i); o++;
-        if (get_bit(blocker, i)) { break; }
-    }
-    o = 1;
-    while (c + o < 8) { // . +
-        let i = 8 * r + c + o;
-        set_bit(res, i); o++;
-        if (get_bit(blocker, i)) { break; }
-    }
-    o = 1;
-    while (0 <= c - o) { // . -
-        let i = 8 * r + c - o;
-        set_bit(res, i); o++;
-        if (get_bit(blocker, i)) { break; }
-    }
-    return res; //.nand(occupancies[0]);
-}
 function bishop_attack_fly(square, blocker) {
     let res = [0, 0];
     let r = square / 8 >> 0; let c = square % 8;
@@ -610,29 +581,58 @@ function bishop_attack_fly(square, blocker) {
     }
     return res; //.nand(occupancies[0]);
 }
+function rook_attack_fly(square, blocker) {
+    let res = [0, 0];
+    let r = square / 8 >> 0; let c = square % 8;
+    let o = 1;
+    while (r + o < 8) { // + .
+        let i = 8 * r + 8 * o + c;
+        set_bit(res, i); o++;
+        if (get_bit(blocker, i)) { break; }
+    }
+    o = 1;
+    while (0 <= r - o) { // - .
+        let i = 8 * r - 8 * o + c;
+        set_bit(res, i); o++;
+        if (get_bit(blocker, i)) { break; }
+    }
+    o = 1;
+    while (c + o < 8) { // . +
+        let i = 8 * r + c + o;
+        set_bit(res, i); o++;
+        if (get_bit(blocker, i)) { break; }
+    }
+    o = 1;
+    while (0 <= c - o) { // . -
+        let i = 8 * r + c - o;
+        set_bit(res, i); o++;
+        if (get_bit(blocker, i)) { break; }
+    }
+    return res; //.nand(occupancies[0]);
+}
 function queen_attack_fly(square, blocker) {
     return or_bitboards(bishop_attack_fly(square, blocker), rook_attack_fly(square, blocker));
 }
 
-function rook_attack(side) {
-    let res = [0, 0];
-
-    let rooks = copy_bitboard(BOARD[6 * side + 1]);
-    while (bool_bitboard(rooks)) {
-        let source = lsb_index(rooks);
-        res = or_bitboards(res, rook_attack_fly(source, BOARD[14]));
-        pop_bit(rooks, source);
-    }
-    return res;
-}
 function bishop_attack(side) {
     let res = [0, 0];
 
-    let bishops = copy_bitboard(BOARD[6 * side + 3]);
+    let bishops = copy_bitboard(BOARD[6 * side + 2]);
     while (bool_bitboard(bishops)) {
         let source = lsb_index(bishops);
         res = or_bitboards(res, bishop_attack_fly(source, BOARD[14]));
         pop_bit(bishops, source);
+    }
+    return res;
+}
+function rook_attack(side) {
+    let res = [0, 0];
+
+    let rooks = copy_bitboard(BOARD[6 * side + 3]);
+    while (bool_bitboard(rooks)) {
+        let source = lsb_index(rooks);
+        res = or_bitboards(res, rook_attack_fly(source, BOARD[14]));
+        pop_bit(rooks, source);
     }
     return res;
 }
@@ -655,12 +655,12 @@ function is_square_attacked(square, side) {
     if (!side && bool_bitboard(and_bitboards(PAWN_ATTACK[1][square], BOARD[0]))) { return 1; }
     // Attacked by ai pawns
     if (side && bool_bitboard(and_bitboards(PAWN_ATTACK[0][square], BOARD[6]))) { return 1; }
-    // Attacked by rooks
-    if (get_bit(rook_attack(side), square)) { return 2; }
     // Attacked by knights
-    if (bool_bitboard(and_bitboards(KNIGHT_ATTACK[square], side ? BOARD[8] : BOARD[2]))) { return 3; }
+    if (bool_bitboard(and_bitboards(KNIGHT_ATTACK[square], side ? BOARD[7] : BOARD[1]))) { return 2; }
     // Attacked by bishops
-    if (get_bit(bishop_attack(side), square)) { return 4; }
+    if (get_bit(bishop_attack(side), square)) { return 3; }
+    // Attacked by rooks
+    if (get_bit(rook_attack(side), square)) { return 4; }
     // Attacked by queens
     if (get_bit(queen_attack(side), square)) { return 5; }
     // Attacked by kings
@@ -725,25 +725,8 @@ function generate_pseudo_moves() {
                 pop_bit(piece_board, source);
             }
         }
-        // Rook moves
-        else if (i == 1) {
-            while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
-                let attacks = nand_bitboards(rook_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
-                while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
-                    if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                        moves.push(create_move(source, att, piece, 0, 1));
-                    } else {
-                        moves.push(create_move(source, att, piece));
-                    }
-                    pop_bit(attacks, att);
-                }
-                pop_bit(piece_board, source);
-            }
-        }
         // Knight moves
-        else if (i == 2) {
+        else if (i == 1) {
             while(bool_bitboard(piece_board)) {
                 let source = lsb_index(piece_board);
                 let attacks = nand_bitboards(KNIGHT_ATTACK[source], BOARD[12 + TURN]);
@@ -760,10 +743,27 @@ function generate_pseudo_moves() {
             }
         }
         // Bishop moves
-        else if (i == 3) {
+        else if (i == 2) {
             while(bool_bitboard(piece_board)) {
                 let source = lsb_index(piece_board);
                 let attacks = nand_bitboards(bishop_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
+                while (bool_bitboard(attacks)) {
+                    let att = lsb_index(attacks);
+                    if (get_bit(BOARD[12 + TURN ^ 1], att)) {
+                        moves.push(create_move(source, att, piece, 0, 1));
+                    } else {
+                        moves.push(create_move(source, att, piece));
+                    }
+                    pop_bit(attacks, att);
+                }
+                pop_bit(piece_board, source);
+            }
+        }
+        // Rook moves
+        else if (i == 3) {
+            while(bool_bitboard(piece_board)) {
+                let source = lsb_index(piece_board);
+                let attacks = nand_bitboards(rook_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
                 while (bool_bitboard(attacks)) {
                     let att = lsb_index(attacks);
                     if (get_bit(BOARD[12 + TURN ^ 1], att)) {
@@ -1196,7 +1196,6 @@ function flip_fen(fen) {
         }
         res = rev_row + res;
         if (fen[i] == " ") {
-            // fen = "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4";
             res += " " + fen[i + 1] + " ";
             if (fen[i + 3] != "-") {
                 while (fen[i + 3] != " ") {
@@ -1235,32 +1234,32 @@ function make_board(fen) {
     if (PLAYER_WHITE) {
         values = {
             P: 1,
-            R: 2,
-            N: 3,
-            B: 4,
+            N: 2,
+            B: 3,
+            R: 4,
             Q: 5,
             K: 6,
     
             p: 7,
-            r: 8,
-            n: 9,
-            b: 10,
+            n: 8,
+            b: 9,
+            r: 10,
             q: 11,
             k: 12,                   
         }
     } else {
         values = {
             P: 7,
-            R: 8,
-            N: 9,
-            B: 10,
+            N: 8,
+            B: 9,
+            R: 10,
             Q: 11,
             K: 12,
     
             p: 1,
-            r: 2,
-            n: 3,
-            b: 4,
+            n: 2,
+            b: 3,
+            r: 4,
             q: 5,
             k: 6,                   
         }
@@ -1376,7 +1375,7 @@ function get_fen() {
     let values; let castle; let en_pass;
     let start; let direction;
     if (PLAYER_WHITE) {
-        values = "PRNBQKprnbqk";
+        values = "PNBRQKpnbrqk";
         castle = (get_castle_pk(CASTLE) ? "K" : "") + (get_castle_pq(CASTLE) ? "Q" : "") + (get_castle_ak(CASTLE) ? "k" : "") + (get_castle_aq(CASTLE) ? "q" : "");
         if (EN_PASSANT_SQUARE) {
             en_pass = String.fromCharCode(97 + EN_PASSANT_SQUARE % 8) + (((64 - EN_PASSANT_SQUARE) / 8 >> 0) + 1);
@@ -1385,7 +1384,7 @@ function get_fen() {
         }
         start = 0; direction = 1;
     } else {
-        values = "prnbqkPRNBQK";
+        values = "pnbrqkPNBRQK";
         castle = (get_castle_pk(CASTLE) ? "k" : "") + (get_castle_pq(CASTLE) ? "q" : "") + (get_castle_ak(CASTLE) ? "K" : "") + (get_castle_aq(CASTLE) ? "Q" : "");
         if (EN_PASSANT_SQUARE) {
             en_pass = String.fromCharCode(97 + 7 - EN_PASSANT_SQUARE % 8) + ((EN_PASSANT_SQUARE / 8 >> 0) + 1);
