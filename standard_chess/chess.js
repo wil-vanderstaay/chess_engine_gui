@@ -669,6 +669,41 @@ function is_square_attacked(square, side) {
     return 0;
 }
 
+function advanced_legal_move(move) {
+    /*
+        Determine if a move is legal or not
+
+        Checkmask 
+            -> when in check, a bitboard of positions that pieces can move to 
+            -> take checking piece, block check
+        Pinmask (8 possible, straight and diagonal)
+            -> bitboard of path from king to checking piece
+            -> pieces on this bitboard cannot move (unless to another square on bitboard then pin maintained)
+        
+        How to deal with legal king moves? Moving into check?
+            -> foreach king move. avoid checkmask but is_square_attacked every other move?
+
+        Pinned enpassant
+            -> cannot enpassant if opponent piece is blocking check (pinned to king)
+            -> special case, if both piece are blocking check together then cannot take 
+        Castling
+            -> cannot castle through or while in check
+        
+    */
+    return true;
+}
+
+function advanced_move_gen() {
+    let moves = generate_pseudo_moves();
+    let res = [];
+    for (let i = 0; i < moves.length; i++) {
+        if (advanced_legal_move(moves[i])) {
+            res.push(moves[i]);
+        }
+    }
+    return res;
+}
+
 function generate_pseudo_moves() {
     let moves = [];
     for (let i = 0; i < 6; i++) {
@@ -1117,7 +1152,7 @@ function pieceDrag(div, pos, pieceTurn) {
     function doLegalMove(target) {
         let res = legal_move(pos, target);
         let moves = res[0]; let move = res[1];
-        if (move) {
+        if (move && advanced_legal_move(move)) {
             if (get_move_promote(move)) { // ask for promote input
                 move |= 983040; // set promote 15
             }
@@ -1424,7 +1459,7 @@ function get_fen() {
         i += direction;
     }
 
-    res = res.slice(0, res.length - 1) + " " + (PLAYER_WHITE ? "w" : "b") + " " + castle + " " + en_pass + " 0 1";
+    res = res.slice(0, res.length - 1) + " " + (PLAYER_WHITE ^ TURN ? "w" : "b") + " " + castle + " " + en_pass + " 0 1";
 
     let dummy = document.createElement("textarea");
     document.body.appendChild(dummy);
@@ -1536,7 +1571,7 @@ function set_gamephase() {
 async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
     let temp = document.getElementById("fen").value;
     if (temp) { fen = temp; }
-    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; }
+    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; } 
     DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_HASH = [];
@@ -1556,9 +1591,6 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     set_gamephase();
 
     display_board();
-
-    console.log(TURN);
-    console.log(PLAYER_WHITE);
 
     if (aiGame) {
         while (true) {

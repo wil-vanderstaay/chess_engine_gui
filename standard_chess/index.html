@@ -19,49 +19,49 @@
     </head>
     <body>
         <div style="margin-left: 150px;">
-        <div id="chess-board" style="float: left;"></div>
+            <div id="chess-board" style="float: left;"></div>
 
-        <div style="float: left; margin-left: 20px; margin-top: 1px; width: 80px; height: 93vh; text-align: center;" id="loading"></div>
+            <div style="float: left; margin-left: 20px; margin-top: 1px; width: 80px; height: 93vh; text-align: center;" id="loading"></div>
 
-        <div style="float: left; margin-left: 20px; margin-top: 40px;">
-            <div style="text-align: center;">
-                <input type="button" value="Undo move" onclick="undo_move()">
+            <div style="float: left; margin-left: 20px; margin-top: 40px;">
+                <div style="text-align: center;">
+                    <input type="button" value="Undo move" onclick="undo_move()">
+                    <br>
+                    
+                    <h3>New Game:</h3>
+                    <input style="width:100px; height:40px;" type="button" value="White" onclick="start_game(true)">
+                    <input style="width:100px; height:40px;" type="button" value="Black" onclick="start_game(false)">
+                    <input style="width:100px; height:40px;" type="button" value="AI vs. AI" onclick="start_game(true, null, 5, true)">
+                    <br><br>
+                    
+                    <input type="button" value="Copy fen" onclick="get_fen()">
+                    <input type="button" value="Copy pgn" onclick="get_pgn()">
+                    <input id="fen" style="width: 129px; margin-left: 20px; color:#808080;" placeholder="Insert fen" type="text">
+                    <br>
+                    
+                    <h3>Endgame:</h3>
+                    <input placeholder="Book endgame" style="width: 90px; color:#808080;" id="book_endgame">
+                    <input placeholder="Play endgame" style="margin-left: 20px; width: 90px; color:#808080;" id="endgame_number">
+                    <input id="endgame_winning" type="text" style="width: 58px; margin-left: 20px;" disabled>
+                </div>
+
                 <br>
-                
-                <h3>New Game:</h3>
-                <input style="width:100px; height:40px;" type="button" value="White" onclick="start_game(true)">
-                <input style="width:100px; height:40px;" type="button" value="Black" onclick="start_game(false)">
-                <input style="width:100px; height:40px;" type="button" value="AI vs. AI" onclick="start_game(true, null, 5, true)">
-                <br><br>
-                
-                <input type="button" value="Copy fen" onclick="get_fen()">
-                <input type="button" value="Copy pgn" onclick="get_pgn()">
-                <input id="fen" style="width: 129px; margin-left: 20px; color:#808080;" placeholder="Insert fen" type="text">
-                <br>
-                
-                <h3>Endgame:</h3>
-                <input placeholder="Book endgame" style="width: 90px; color:#808080;" id="book_endgame">
-                <input placeholder="Play endgame" style="margin-left: 20px; width: 90px; color:#808080;" id="endgame_number">
-                <input id="endgame_winning" type="text" style="width: 58px; margin-left: 20px;" disabled>
+
+                <div id="detail_card" style="outline: 5px solid black; padding: 10px; width: 300px;"> <!--background-color: lightblue;-->
+                    <h3 id="move_number" style="text-align: center;">Move number:</h3>
+                    <h3>
+                        Depth:
+                        <input type="text" style="width: 68px; margin-left: 82px;" id="depth_input" disabled>
+                        <input placeholder="Override" style="width: 68px;" id="depth_override">
+                    </h3>
+                    <h3>Analysed:<input type="text" style="width: 150px; float: right;" id="analysed" disabled></h3>
+                    <h3>Time:<input type="text" style="width: 150px; float: right;" id="time" disabled></h3>
+                    <br>
+                    <h3><input type="text" style="width: 150px; float: right;" id="move" disabled hidden></h3>
+                    <h3>Evaluation:<input type="text" style="width: 150px; float: right;" id="evaluation" disabled></h3>
+                    <h3><input style="overflow-y: auto;" type="checkbox" id="lineCheckbox" onclick="showLines()">Lines:<input type="text" style="width: 215px; float: right;" id="lines" disabled></h3> 
+                </div>
             </div>
-
-            <br>
-
-            <div id="detail_card" style="outline: 5px solid black; padding: 10px; width: 300px;"> <!--background-color: lightblue;-->
-                <h3 id="move_number" style="text-align: center;">Move number:</h3>
-                <h3>
-                    Depth:
-                    <input type="text" style="width: 68px; margin-left: 82px;" id="depth_input" disabled>
-                    <input placeholder="Override" style="width: 68px;" id="depth_override">
-                </h3>
-                <h3>Analysed:<input type="text" style="width: 150px; float: right;" id="analysed" disabled></h3>
-                <h3>Time:<input type="text" style="width: 150px; float: right;" id="time" disabled></h3>
-                <br>
-                <h3><input type="text" style="width: 150px; float: right;" id="move" disabled hidden></h3>
-                <h3>Evaluation:<input type="text" style="width: 150px; float: right;" id="evaluation" disabled></h3>
-                <h3><input style="overflow-y: auto;" type="checkbox" id="lineCheckbox" onclick="showLines()">Lines:<input type="text" style="width: 215px; float: right;" id="lines" disabled></h3> 
-            </div>
-        </div>
         </div>
 
         <script src="ai.js"></script>
