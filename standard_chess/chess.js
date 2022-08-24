@@ -648,7 +648,27 @@ function queen_attack(side) {
     return res;
 }
 
-function mask_bishop_attacks(square) {
+let BISHOP_ATTACK_MASK_COUNT = [
+    6, 5, 5, 5, 5, 5, 5, 6,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    5, 5, 7, 7, 7, 7, 5, 5,
+    5, 5, 7, 9, 9, 7, 5, 5,
+    5, 5, 7, 9, 9, 7, 5, 5,
+    5, 5, 7, 7, 7, 7, 5, 5,
+    5, 5, 5, 5, 5, 5, 5, 5,
+    6, 5, 5, 5, 5, 5, 5, 6
+];
+let ROOK_ATTACK_MASK_COUNT = [
+    12, 11, 11, 11, 11, 11, 11, 12,
+    11, 10, 10, 10, 10, 10, 10, 11,
+    11, 10, 10, 10, 10, 10, 10, 11,
+    11, 10, 10, 10, 10, 10, 10, 11,
+    11, 10, 10, 10, 10, 10, 10, 11,
+    11, 10, 10, 10, 10, 10, 10, 11,
+    11, 10, 10, 10, 10, 10, 10, 11,
+    12, 11, 11, 11, 11, 11, 11, 12
+];
+function mask_bishop_attack(square) {
     let res = [0, 0];
     let r = square >> 3; let c = square % 8;
     let o = 1;
@@ -673,7 +693,7 @@ function mask_bishop_attacks(square) {
     }
     return res;
 }
-function mask_rook_attacks(square) {
+function mask_rook_attack(square) {
     let res = [0, 0];
     let r = square >> 3; let c = square % 8;
     let o = 1;
@@ -695,6 +715,19 @@ function mask_rook_attacks(square) {
     while (1 <= c - o) { // . -
         let i = 8 * r + c - o;
         set_bit(res, i); o++;
+    }
+    return res;
+}
+function get_occupancy(attack_mask, occupancy_value) {
+    let bits_number = count_bits(attack_mask);
+    let res = [0, 0];
+    for (let i = 0; i < bits_number; i++) {
+        let square = lsb_index(attack_mask);
+        pop_bit(attack_mask, square);
+
+        if (occupancy_value & (1 << i)) {
+            set_bit(res, square);
+        }
     }
     return res;
 }
