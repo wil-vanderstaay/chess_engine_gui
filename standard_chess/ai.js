@@ -25,8 +25,8 @@ function perft(depth, print=1) {
             let letters = "abcdefgh";
             let move_source = get_move_source(move);
             let move_target = get_move_target(move);
-            let start_pos = letters[move_source % 8] + (8 - (move_source  << 3));
-            let end_pos = letters[move_target % 8] + (8 - (move_target << 3));
+            let start_pos = letters[move_source % 8] + (8 - (move_source  >> 3));
+            let end_pos = letters[move_target % 8] + (8 - (move_target >> 3));
             console.log(start_pos, end_pos, res - start_res);
         }
 
