@@ -7,8 +7,8 @@ function perft(depth, print=1) {
         let move = moves[i];
 
         // Copy state
-        let copy_board = copy_board(BOARD);
-        let copy_castle = copy_castle(CASTLE);
+        let cb = copy_board(BOARD);
+        let copy_castle = CASTLE;
         let copy_en = EN_PASSANT_SQUARE;
         let copy_turn = TURN;
 
@@ -31,7 +31,7 @@ function perft(depth, print=1) {
         }
 
         // Reset state
-        BOARD = copy_board;
+        BOARD = cb;
         CASTLE = copy_castle;
         EN_PASSANT_SQUARE = copy_en;
         TURN = copy_turn;
@@ -688,8 +688,12 @@ function score_move(move) { // IMPORTANT
 
         // Encourage moving away from attacked square
         let threatened_by_pawn = (!TURN && bool_bitboard(and_bitboards(PAWN_ATTACK[1][source], BOARD[0]))) || (TURN && bool_bitboard(and_bitboards(PAWN_ATTACK[0][source], BOARD[6])));
-        let threatened_by_minor = (bool_bitboard(and_bitboards(KNIGHT_ATTACK[source], TURN ? BOARD[7] : BOARD[1]))) || (get_bit(bishop_attack(TURN), source));
-        let threatened_by_rook = get_bit(rook_attack(TURN), source);
+        let threatened_by_minor = 
+            (bool_bitboard(and_bitboards(KNIGHT_ATTACK[source], TURN ? BOARD[7] : BOARD[1]))) || 
+            (bool_bitboard(and_bitboards(bishop_attack_fly(source, BOARD[14]), TURN ? BOARD[8] : BOARD[2])));
+            // (get_bit(bishop_attack(TURN), source));
+        let threatened_by_rook = bool_bitboard(and_bitboards(rook_attack_fly(source, BOARD[14]), TURN ? BOARD[9] : BOARD[3]));
+
 
         if (piece_type >= 1 && threatened_by_pawn) { res += 3 * piece_type; }
         else if (piece_type >= 3 && threatened_by_minor) { res += 2 * piece_type; }
