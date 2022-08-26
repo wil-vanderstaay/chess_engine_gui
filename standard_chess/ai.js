@@ -25,8 +25,8 @@ function perft(depth, print=1) {
             let letters = "abcdefgh";
             let move_source = get_move_source(move);
             let move_target = get_move_target(move);
-            let start_pos = letters[move_source % 8] + (8 - (move_source / 8 >> 0));
-            let end_pos = letters[move_target % 8] + (8 - (move_target / 8 >> 0));
+            let start_pos = letters[move_source % 8] + (8 - (move_source >> 3));
+            let end_pos = letters[move_target % 8] + (8 - (move_target >> 3));
             console.log(start_pos, end_pos, res - start_res);
         }
 
@@ -617,7 +617,7 @@ function get_gamephase_score() {
 function piece_val_map(piece, pos, opening) {
     if (piece >= 6) {
         piece -= 6;
-        pos += (7 - (pos / 8 << 1)) << 3; // flip rows
+        pos += (7 - (pos >> 3 << 1)) << 3; // flip rows
     }
     if (!PLAYER_WHITE) {
         pos += 7 - (pos % 8 << 1); // flip cols
