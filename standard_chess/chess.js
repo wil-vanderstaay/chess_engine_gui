@@ -14,7 +14,7 @@ function create_move(source, target, piece, promote=0, capture=0, double=0, enpa
     return (source) | (target << 6) | (piece << 12) | (promote << 16) | (capture << 20) | (double << 21) | (enpassant << 22) | (castle << 23);
 }
 function print_move(move) {
-    let pieces = "PRNBQKprnbqk";
+    let pieces = "PNBRQKpnbrqk";
     let res = pieces[get_move_piece(move)] + " " + get_move_source(move) + " -> " + get_move_target(move);
     if (get_move_capture(move)) { res += " X"; }
     if (get_move_promote(move)) { res += " P"; }
@@ -658,11 +658,11 @@ function is_square_attacked(square, side) {
     // Attacked by knights
     if (bool_bitboard(and_bitboards(KNIGHT_ATTACK[square], side ? BOARD[7] : BOARD[1]))) { return 2; }
     // Attacked by bishops
-    if (get_bit(bishop_attack(side), square)) { return 3; }
+    if (bool_bitboard(and_bitboards(bishop_attack_fly(square, BOARD[14]), side ? BOARD[8] : BOARD[2]))) { return 3; }
     // Attacked by rooks
-    if (get_bit(rook_attack(side), square)) { return 4; }
+    if (bool_bitboard(and_bitboards(rook_attack_fly(square, BOARD[14]), side ? BOARD[9] : BOARD[3]))) { return 4; }
     // Attacked by queens
-    if (get_bit(queen_attack(side), square)) { return 5; }
+    if (bool_bitboard(and_bitboards(queen_attack_fly(square, BOARD[14]), side ? BOARD[10] : BOARD[4]))) { return 5; }
     // Attacked by kings
     if (bool_bitboard(and_bitboards(KING_ATTACK[square], side ? BOARD[11] : BOARD[5]))) { return 6; }
     

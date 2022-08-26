@@ -687,20 +687,8 @@ function score_move(move) { // IMPORTANT
         let res = history_moves[piece][target]; 
 
         // Encourage moving away from attacked square
-        let threatened_by_pawn = (!TURN && bool_bitboard(and_bitboards(PAWN_ATTACK[1][source], BOARD[0]))) || (TURN && bool_bitboard(and_bitboards(PAWN_ATTACK[0][source], BOARD[6])));
-        let threatened_by_minor = (bool_bitboard(and_bitboards(KNIGHT_ATTACK[source], TURN ? BOARD[7] : BOARD[1]))) || (get_bit(bishop_attack(TURN), source));
-        let threatened_by_rook = get_bit(rook_attack(TURN), source);
-
-        if (piece_type >= 1 && threatened_by_pawn) { res += 3 * piece_type; }
-        else if (piece_type >= 3 && threatened_by_minor) { res += 2 * piece_type; }
-        else if (piece_type >= 4 && threatened_by_rook) { res += piece_type; }
 
         // // Discourage moving to attacked square
-        // let target_attacked = is_square_attacked(target, TURN ^ 1);
-        // if (target_attacked) {
-        //     target_attacked--;
-        //     res -= 100 * Math.max(piece % 6 - target_attacked % 6, 0);
-        // }
 
         return res;
     }
