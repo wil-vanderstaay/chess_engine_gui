@@ -1300,8 +1300,11 @@ function search(depth) {
         }
         console.log(res);
     } 
+    if (TURN && PLAYER_WHITE) {
+        eval *= -1;
+    }
     if (pv_table[0][0]) {
-        console.log("Best move: " + (get_move_desc(pv_table[0][0])) + ", eval: " + (eval * (PLAYER_WHITE ? -1 : 1)));
+        console.log("Best move: " + (get_move_desc(pv_table[0][0])) + ", eval: " + (eval));
     }
     console.log(" ");
 
