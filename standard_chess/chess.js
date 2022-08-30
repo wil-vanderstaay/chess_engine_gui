@@ -207,16 +207,34 @@ function pop_bit(bitboard, i) {
     return bit;
 }
 
+function count_number_bits(number) {
+	number -= (number >>> 1) & 0x55555555;
+	number = (number & 0x33333333) + ((number >>> 2) & 0x33333333);
+	return ((number + (number >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
+}
 function count_bits(bitboard) {
-    let res = 0;
-    while (bitboard[0] != 0 || bitboard[1] != 0) {
-        res++;
-        bitboard = and_bitboards(bitboard, minus1_bitboard(bitboard));
-    }
-    return res;
+    return count_number_bits(bitboard[0]) + count_number_bits(bitboard[1]);
+}
+
+function lsb_number_index(number) {
+    return count_number_bits((number & -number) - 1);
 }
 function lsb_index(bitboard) {
-    return count_bits(minus1_bitboard(and_bitboards(bitboard, neg_bitboard(bitboard))));
+    if (bitboard[0]) {
+        return lsb_number_index(bitboard[0]);
+    }
+    return 32 + lsb_number_index(bitboard[1]);
+}
+function pop_lsb_index(bitboard) {
+    let index;
+    if (bitboard[0]) {
+        index = lsb_number_index(bitboard[0]);
+        bitboard[0] &= bitboard[0] - 1;
+    } else {
+        index = 32 + lsb_number_index(bitboard[1]);
+        bitboard[1] &= bitboard[1] - 1;
+    }
+    return index;
 }
 
 function bool_bitboard(bitboard) {
@@ -687,170 +705,6 @@ function smart_generate_pseudo_moves() {
 
 function generate_pseudo_moves() {
     let moves = [];
-
-    // Pawn moves
-    let piece = 6 * TURN; 
-    let piece_board = copy_bitboard(BOARD[piece]);
-    while (bool_bitboard(piece_board)) {
-        let source = lsb_index(piece_board);
-        let target = source + [-1, 1][TURN] * 8;
-
-        // Push
-        if (!get_bit(BOARD[14], target)) {
-            let trow = target >> 3;
-            if (trow == 0 || trow == 7) { // promotion
-                moves.push(create_move(source, target, piece, piece + 1)); // rook
-                moves.push(create_move(source, target, piece, piece + 2)); // knight
-                moves.push(create_move(source, target, piece, piece + 3)); // bishop
-                moves.push(create_move(source, target, piece, piece + 4)); // queen
-            } else {
-                // One square push
-                moves.push(create_move(source, target, piece));
-                // Two square push
-                if (source >> 3 == [6, 1][TURN] && !get_bit(BOARD[14], target + [-1, 1][TURN] * 8)) {
-                    moves.push(create_move(source, target + [-1, 1][TURN] * 8, piece, 0, 0, 1));
-                }
-            }
-        }
-
-        // Capture
-        let attacks = and_bitboards(PAWN_ATTACK[TURN][source], BOARD[12 + TURN ^ 1]);
-        while (bool_bitboard(attacks)) {
-            let att = lsb_index(attacks);
-            let arow = att >> 3;
-            if (arow == 0 || arow == 7) { // Promote
-                moves.push(create_move(source, att, piece, piece + 1, 1));
-                moves.push(create_move(source, att, piece, piece + 2, 1));
-                moves.push(create_move(source, att, piece, piece + 3, 1));
-                moves.push(create_move(source, att, piece, piece + 4, 1));
-            } else {
-                moves.push(create_move(source, att, piece, 0, 1));
-            }
-            pop_bit(attacks, att);
-
-        }
-        // En passant
-        if (EN_PASSANT_SQUARE && get_bit(PAWN_ATTACK[TURN][source], EN_PASSANT_SQUARE)) {
-                moves.push(create_move(source, EN_PASSANT_SQUARE, piece, 0, 1, 0, 1));
-        }
-
-        // Pop
-        pop_bit(piece_board, source);
-    }
-    // Knight moves
-    piece++; piece_board = copy_bitboard(BOARD[piece]);
-    while(bool_bitboard(piece_board)) {
-        let source = lsb_index(piece_board);
-        let attacks = nand_bitboards(KNIGHT_ATTACK[source], BOARD[12 + TURN]);
-        while (bool_bitboard(attacks)) {
-            let att = lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
-            pop_bit(attacks, att);
-        }
-        pop_bit(piece_board, source);
-    }
-    // Bishop moves
-    piece++; piece_board = copy_bitboard(BOARD[piece]);
-    while(bool_bitboard(piece_board)) {
-        let source = lsb_index(piece_board);
-        let attacks = nand_bitboards(bishop_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
-        while (bool_bitboard(attacks)) {
-            let att = lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
-            pop_bit(attacks, att);
-        }
-        pop_bit(piece_board, source);
-    }
-    // Rook moves
-    piece++; piece_board = copy_bitboard(BOARD[piece]);
-    while(bool_bitboard(piece_board)) {
-        let source = lsb_index(piece_board);
-        let attacks = nand_bitboards(rook_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
-        while (bool_bitboard(attacks)) {
-            let att = lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
-            pop_bit(attacks, att);
-        }
-        pop_bit(piece_board, source);
-    }
-    // Queen moves
-    piece++; piece_board = copy_bitboard(BOARD[piece]);
-    while(bool_bitboard(piece_board)) {
-        let source = lsb_index(piece_board);
-        let attacks = nand_bitboards(queen_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
-        while (bool_bitboard(attacks)) {
-            let att = lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
-            pop_bit(attacks, att);
-        }
-        pop_bit(piece_board, source);
-    }
-    // King moves
-    piece++; piece_board = copy_bitboard(BOARD[piece]);
-    // Normal moves
-    let source = lsb_index(piece_board);
-    let attacks = nand_bitboards(KING_ATTACK[source], BOARD[12 + TURN]);
-    while (bool_bitboard(attacks)) {
-        let att = lsb_index(attacks);
-        if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-            moves.push(create_move(source, att, piece, 0, 1));
-        } else {
-            moves.push(create_move(source, att, piece));
-        }
-        pop_bit(attacks, att);
-    }
-
-    
-    // Castling
-    if (CASTLE) {
-        let king_pos = [60, 4][TURN];
-        let king_side = [[61, 62], [5, 6]][TURN];
-        let queen_side = [[59, 58, 57], [3, 2, 1]][TURN];
-        if (!PLAYER_WHITE) {
-            king_pos--;
-            king_side[0] -= 3;
-            king_side[1] -= 5;
-            queen_side[0] += 1;
-            queen_side[1] += 3;
-            queen_side[2] += 5;
-        }
-
-        if ((!TURN && get_castle_pk(CASTLE)) || (TURN && get_castle_ak(CASTLE))) {
-            if (!get_bit(BOARD[14], king_side[0]) && !get_bit(BOARD[14], king_side[1])) {
-                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_side[0], TURN ^ 1)) {
-                    moves.push(create_move(king_pos, king_side[1], piece, 0, 0, 0, 0, 1));
-                }
-            }
-        }
-        if ((!TURN && get_castle_pq(CASTLE)) || (TURN && get_castle_aq(CASTLE))) {
-            if (!get_bit(BOARD[14], queen_side[0]) && !get_bit(BOARD[14], queen_side[1]) && !get_bit(BOARD[14], queen_side[2])) {
-                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(queen_side[0], TURN ^ 1)) {
-                    moves.push(create_move(king_pos, queen_side[1], piece, 0, 0, 0, 0, 1));
-                }
-            }
-        }
-    }
-    return moves;
-}
-
-function generate_pseudo_moves2() {
-    let moves = [];
     for (let i = 0; i < 6; i++) {
         let piece = 6 * TURN + i;
         let piece_board = copy_bitboard(BOARD[piece]);
@@ -858,7 +712,7 @@ function generate_pseudo_moves2() {
         // Pawn moves
         if (i == 0) {
             while (bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
+                let source = pop_lsb_index(piece_board);
                 let target = source + [-1, 1][TURN] * 8;
 
                 // Push
@@ -883,7 +737,7 @@ function generate_pseudo_moves2() {
                 // Capture
                 let attacks = and_bitboards(PAWN_ATTACK[TURN][source], BOARD[12 + TURN ^ 1]);
                 while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
+                    let att = pop_lsb_index(attacks);
                     let arow = att >> 3;
                     if (arow == 0 || arow == 7) { // Promote
                         moves.push(create_move(source, att, piece, piece + 1, 1));
@@ -893,84 +747,72 @@ function generate_pseudo_moves2() {
                     } else {
                         moves.push(create_move(source, att, piece, 0, 1));
                     }
-                    pop_bit(attacks, att);
 
                 }
                 // En passant
                 if (EN_PASSANT_SQUARE && get_bit(PAWN_ATTACK[TURN][source], EN_PASSANT_SQUARE)) {
                         moves.push(create_move(source, EN_PASSANT_SQUARE, piece, 0, 1, 0, 1));
                 }
-
-                // Pop
-                pop_bit(piece_board, source);
             }
         }
         // Knight moves
         else if (i == 1) {
             while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
+                let source = pop_lsb_index(piece_board);
                 let attacks = nand_bitboards(KNIGHT_ATTACK[source], BOARD[12 + TURN]);
                 while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
+                    let att = pop_lsb_index(attacks);
                     if (get_bit(BOARD[12 + TURN ^ 1], att)) {
                         moves.push(create_move(source, att, piece, 0, 1));
                     } else {
                         moves.push(create_move(source, att, piece));
                     }
-                    pop_bit(attacks, att);
                 }
-                pop_bit(piece_board, source);
             }
         }
         // Bishop moves
         else if (i == 2) {
             while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
+                let source = pop_lsb_index(piece_board);
                 let attacks = nand_bitboards(bishop_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
                 while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
+                    let att = pop_lsb_index(attacks);
                     if (get_bit(BOARD[12 + TURN ^ 1], att)) {
                         moves.push(create_move(source, att, piece, 0, 1));
                     } else {
                         moves.push(create_move(source, att, piece));
                     }
-                    pop_bit(attacks, att);
                 }
-                pop_bit(piece_board, source);
             }
         }
         // Rook moves
         else if (i == 3) {
             while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
+                let source = pop_lsb_index(piece_board);
                 let attacks = nand_bitboards(rook_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
                 while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
+                    let att = pop_lsb_index(attacks);
                     if (get_bit(BOARD[12 + TURN ^ 1], att)) {
                         moves.push(create_move(source, att, piece, 0, 1));
                     } else {
                         moves.push(create_move(source, att, piece));
                     }
-                    pop_bit(attacks, att);
                 }
-                pop_bit(piece_board, source);
             }
         }
         // Queen moves
         else if (i == 4) {
             while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
+                let source = pop_lsb_index(piece_board);
                 let attacks = nand_bitboards(queen_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
                 while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
+                    let att = pop_lsb_index(attacks);
                     if (get_bit(BOARD[12 + TURN ^ 1], att)) {
                         moves.push(create_move(source, att, piece, 0, 1));
                     } else {
                         moves.push(create_move(source, att, piece));
                     }
-                    pop_bit(attacks, att);
                 }
-                pop_bit(piece_board, source);
             }
         }
         // King moves
@@ -979,187 +821,12 @@ function generate_pseudo_moves2() {
             let source = lsb_index(piece_board);
             let attacks = nand_bitboards(KING_ATTACK[source], BOARD[12 + TURN]);
             while (bool_bitboard(attacks)) {
-                let att = lsb_index(attacks);
+                let att = pop_lsb_index(attacks);
                 if (get_bit(BOARD[12 + TURN ^ 1], att)) {
                     moves.push(create_move(source, att, piece, 0, 1));
                 } else {
                     moves.push(create_move(source, att, piece));
                 }
-                pop_bit(attacks, att);
-            }
-
-            
-            // Castling
-            if (CASTLE) {
-                let king_pos = [60, 4][TURN];
-                let king_side = [[61, 62], [5, 6]][TURN];
-                let queen_side = [[59, 58, 57], [3, 2, 1]][TURN];
-                if (!PLAYER_WHITE) {
-                    king_pos--;
-                    king_side[0] -= 3;
-                    king_side[1] -= 5;
-                    queen_side[0] += 1;
-                    queen_side[1] += 3;
-                    queen_side[2] += 5;
-                }
-
-                if ((!TURN && get_castle_pk(CASTLE)) || (TURN && get_castle_ak(CASTLE))) {
-                    if (!get_bit(BOARD[14], king_side[0]) && !get_bit(BOARD[14], king_side[1])) {
-                        if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_side[0], TURN ^ 1)) {
-                            moves.push(create_move(king_pos, king_side[1], piece, 0, 0, 0, 0, 1));
-                        }
-                    }
-                }
-                if ((!TURN && get_castle_pq(CASTLE)) || (TURN && get_castle_aq(CASTLE))) {
-                    if (!get_bit(BOARD[14], queen_side[0]) && !get_bit(BOARD[14], queen_side[1]) && !get_bit(BOARD[14], queen_side[2])) {
-                        if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(queen_side[0], TURN ^ 1)) {
-                            moves.push(create_move(king_pos, queen_side[1], piece, 0, 0, 0, 0, 1));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return moves;
-}
-
-function generate_pseudo_moves() {
-    let moves = [];
-    for (let i = 0; i < 6; i++) {
-        let piece = 6 * TURN + i;
-        let piece_board = copy_bitboard(BOARD[piece]);
-
-        // Pawn moves
-        if (i == 0) {
-            while (bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
-                let target = source + [-1, 1][TURN] * 8;
-
-                // Push
-                if (0 <= target && target < 64 && !get_bit(BOARD[14], target)) {
-                    let trow = target >> 3;
-                    if (trow == 0 || trow == 7) { // promotion
-                        moves.push(create_move(source, target, piece, piece + 1)); // rook
-                        moves.push(create_move(source, target, piece, piece + 2)); // knight
-                        moves.push(create_move(source, target, piece, piece + 3)); // bishop
-                        moves.push(create_move(source, target, piece, piece + 4)); // queen
-                    } else {
-                        // One square push
-                        moves.push(create_move(source, target, piece));
-                        // Two square push
-                        let srow = source >> 3;
-                        if (srow == [6, 1][TURN] && !get_bit(BOARD[14], target + [-1, 1][TURN] * 8)) {
-                            moves.push(create_move(source, target + [-1, 1][TURN] * 8, piece, 0, 0, 1));
-                        }
-                    }
-                }
-
-                // Capture
-                let attacks = and_bitboards(PAWN_ATTACK[TURN][source], BOARD[12 + TURN ^ 1]);
-                while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
-                    let arow = att >> 3;
-                    if (arow == 0 || arow == 7) { // Promote
-                        moves.push(create_move(source, att, piece, piece + 1, 1));
-                        moves.push(create_move(source, att, piece, piece + 2, 1));
-                        moves.push(create_move(source, att, piece, piece + 3, 1));
-                        moves.push(create_move(source, att, piece, piece + 4, 1));
-                    } else {
-                        moves.push(create_move(source, att, piece, 0, 1));
-                    }
-                    pop_bit(attacks, att);
-
-                }
-                // En passant
-                if (EN_PASSANT_SQUARE && get_bit(PAWN_ATTACK[TURN][source], EN_PASSANT_SQUARE)) {
-                        moves.push(create_move(source, EN_PASSANT_SQUARE, piece, 0, 1, 0, 1));
-                }
-
-                // Pop
-                pop_bit(piece_board, source);
-            }
-        }
-        // Knight moves
-        else if (i == 1) {
-            while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
-                let attacks = nand_bitboards(KNIGHT_ATTACK[source], BOARD[12 + TURN]);
-                while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
-                    if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                        moves.push(create_move(source, att, piece, 0, 1));
-                    } else {
-                        moves.push(create_move(source, att, piece));
-                    }
-                    pop_bit(attacks, att);
-                }
-                pop_bit(piece_board, source);
-            }
-        }
-        // Bishop moves
-        else if (i == 2) {
-            while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
-                let attacks = nand_bitboards(bishop_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
-                while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
-                    if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                        moves.push(create_move(source, att, piece, 0, 1));
-                    } else {
-                        moves.push(create_move(source, att, piece));
-                    }
-                    pop_bit(attacks, att);
-                }
-                pop_bit(piece_board, source);
-            }
-        }
-        // Rook moves
-        else if (i == 3) {
-            while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
-                let attacks = nand_bitboards(rook_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
-                while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
-                    if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                        moves.push(create_move(source, att, piece, 0, 1));
-                    } else {
-                        moves.push(create_move(source, att, piece));
-                    }
-                    pop_bit(attacks, att);
-                }
-                pop_bit(piece_board, source);
-            }
-        }
-        // Queen moves
-        else if (i == 4) {
-            while(bool_bitboard(piece_board)) {
-                let source = lsb_index(piece_board);
-                let attacks = nand_bitboards(queen_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
-                while (bool_bitboard(attacks)) {
-                    let att = lsb_index(attacks);
-                    if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                        moves.push(create_move(source, att, piece, 0, 1));
-                    } else {
-                        moves.push(create_move(source, att, piece));
-                    }
-                    pop_bit(attacks, att);
-                }
-                pop_bit(piece_board, source);
-            }
-        }
-        // King moves
-        else if (i == 5) {
-            // Normal moves
-            let source = lsb_index(piece_board);
-            let attacks = nand_bitboards(KING_ATTACK[source], BOARD[12 + TURN]);
-            while (bool_bitboard(attacks)) {
-                let att = lsb_index(attacks);
-                if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                    moves.push(create_move(source, att, piece, 0, 1));
-                } else {
-                    moves.push(create_move(source, att, piece));
-                }
-                pop_bit(attacks, att);
             }
 
             
