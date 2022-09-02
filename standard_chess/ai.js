@@ -1027,33 +1027,30 @@ function piece_val_map(piece, pos, opening) {
 function evaluate_board() { // LOWER BOUND
     let opening_res = 0;
     let endgame_res = 0;
-    for (let piece = 0; piece < 12; piece++) {
+    for (let piece = 0; piece < 6; piece++) {
         let theboard = copy_bitboard(BOARD[piece]);
         while (bool_bitboard(theboard)) {
-            let index = lsb_index(theboard);
-
-            if (piece < 6) { // player
-                opening_res += piece_val_map(piece, index, 1);
-                endgame_res += piece_val_map(piece, index, 0);
-            } else { // ai
-                opening_res -= piece_val_map(piece, index, 1);
-                endgame_res -= piece_val_map(piece, index, 0);
-            }
-
-            pop_bit(theboard, index);
+            let index = pop_lsb_index(theboard);
+            opening_res += piece_val_map(piece, index, 1);
+            endgame_res += piece_val_map(piece, index, 0);
+        }
+    }
+    for (let piece = 6; piece < 12; piece++) {
+        let theboard = copy_bitboard(BOARD[piece]);
+        while (bool_bitboard(theboard)) {
+            let index = pop_lsb_index(theboard);
+            opening_res -= piece_val_map(piece, index, 1);
+            endgame_res -= piece_val_map(piece, index, 0);
         }
     }
 
     let gamephase_score = get_gamephase_score();
     let res = 0;
     if (gamephase_score > opening_phase) { // OPENING
-        GAMEPHASE = 0;
         res = opening_res;
     } else if (gamephase_score < endgame_phase) { // ENDGAME
-        GAMEPHASE = 2;
         res = endgame_res; 
     } else { // MIDDLEGAME
-        GAMEPHASE = 1;
         res = (opening_res * gamephase_score + endgame_res * (opening_phase - gamephase_score)) / opening_phase << 0;
     }
     return (TURN) ? -res : res;
@@ -1207,7 +1204,6 @@ function best_eval(depth, alpha, beta) {
         // Copy state
         let cb = copy_board(BOARD);
         let cc = CASTLE;
-        let cg = GAMEPHASE;
         let copy_en = EN_PASSANT_SQUARE;
         let copy_turn = TURN;
         let copy_hash = copy_bitboard(hash_key);
@@ -1231,7 +1227,6 @@ function best_eval(depth, alpha, beta) {
         // Reset state
         BOARD = cb;
         CASTLE = cc;
-        GAMEPHASE = cg;
         EN_PASSANT_SQUARE = copy_en;
         TURN = copy_turn;
         hash_key = copy_hash;

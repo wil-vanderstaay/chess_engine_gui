@@ -1110,12 +1110,6 @@ function doAiMove(differentAi=false) {
             LOOKAHEAD_COUNT = 0
         }
     }
-
-    let gamephase_score = get_gamephase_score();
-    if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
-    else if (gamephase_score < endgame_phase) { GAMEPHASE = 2; }
-    else { GAMEPHASE = 1; }
-
     display_board();
     highlightLastMove(best_move);
 
@@ -1669,13 +1663,6 @@ function override_depth() {
     alert("Depth updated");
 }
 
-function set_gamephase() {
-    let gamephase_score = get_gamephase_score();
-    if (gamephase_score > opening_phase) { GAMEPHASE = 0; }
-    else if (gamephase_score < endgame_phase) { GAMEPHASE = 2; }
-    else { GAMEPHASE = 1; }
-}
-
 async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
     let temp = document.getElementById("fen").value;
     if (temp) { fen = temp; }
@@ -1695,8 +1682,6 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     make_table(whiteDown);
     BOARD = make_board(fen);
     hash_key = init_hash();
-
-    set_gamephase();
 
     display_board();
 
@@ -1735,7 +1720,6 @@ let EN_PASSANT_SQUARE; // pawn moves 2 spots, record position behind pawn
 let LOOKAHEAD_COUNT = 0;
 let LOOKAHEAD;
 
-let GAMEPHASE = 0;
 let opening_phase = 6192;
 let endgame_phase = 518;
 
