@@ -1045,14 +1045,13 @@ function evaluate_board() { // LOWER BOUND
     }
 
     let gamephase_score = get_gamephase_score();
-    let res = 0;
     if (gamephase_score > opening_phase) { // OPENING
-        res = opening_res;
+        return (TURN) ? -opening_res : opening_res;
     } else if (gamephase_score < endgame_phase) { // ENDGAME
-        res = endgame_res; 
-    } else { // MIDDLEGAME
-        res = (opening_res * gamephase_score + endgame_res * (opening_phase - gamephase_score)) / opening_phase << 0;
+        return (TURN) ? -endgame_res : endgame_res;
     }
+    // MIDDLEGAME
+    let res = (opening_res * gamephase_score + endgame_res * (opening_phase - gamephase_score)) / opening_phase << 0;
     return (TURN) ? -res : res;
 }
 
@@ -1062,13 +1061,13 @@ function score_move(move) { // IMPORTANT
         return 20000; // was determined best move in prev search
     }
 
-    let source = get_move_source(move);
     let target = get_move_target(move); 
     let piece = get_move_piece(move);
     let piece_type = piece % 6;
 
     if (get_move_capture(move)) {
-        for (let i = 6 * (1 - TURN); i < 6 * (1 - TURN) + 6; i++) {
+        let end = 6 * (1 - TURN) + 6;
+        for (let i = 6 * (1 - TURN); i < end; i++) {
             if (get_bit(BOARD[i], target)) {
                 return 10005 - piece_type + 100 * (i % 6 + 1); // + capture_val(piece, i);
             }
@@ -1078,15 +1077,7 @@ function score_move(move) { // IMPORTANT
     }
     if (move == killer_moves[0][ply]) { return 9000; }
     else if (move == killer_moves[1][ply]) { return 8000; }
-    else { 
-        let res = history_moves[piece][target]; 
-
-        // Encourage moving away from attacked square
-
-        // // Discourage moving to attacked square
-
-        return res;
-    }
+    return history_moves[piece][target]; 
 }
 
 function enable_pv_scoring(moves) {
@@ -1137,7 +1128,6 @@ function best_eval_captures(alpha, beta, depth) {
         // Copy state
         let cb = copy_board(BOARD);
         let cc = CASTLE;
-        let cg = GAMEPHASE;
         let copy_en = EN_PASSANT_SQUARE;
         let copy_turn = TURN;
         let copy_hash = copy_bitboard(hash_key);
@@ -1154,7 +1144,6 @@ function best_eval_captures(alpha, beta, depth) {
         // Reset state
         BOARD = cb;
         CASTLE = cc;
-        GAMEPHASE = cg;
         EN_PASSANT_SQUARE = copy_en;
         TURN = copy_turn;
         hash_key = copy_hash;
