@@ -1005,9 +1005,9 @@ function init_hash() {
 
 function get_gamephase_score() {
     let res = 0;
-    for (let i = 1; i < 5; i++) { // TODO: start at i=0?
+    for (let i = 1; i < 5; i++) {
         res += count_bits(BOARD[i]) * piece_values[i];
-        res += count_bits(BOARD[i + 1]) * piece_values[i];
+        res += count_bits(BOARD[i + 6]) * piece_values[i];
     }
     return res;
 }
@@ -1034,13 +1034,11 @@ function evaluate_board() { // LOWER BOUND
             opening_res += piece_val_map(piece, index, 1);
             endgame_res += piece_val_map(piece, index, 0);
         }
-    }
-    for (let piece = 6; piece < 12; piece++) {
-        let theboard = copy_bitboard(BOARD[piece]);
+        theboard = copy_bitboard(BOARD[piece + 6]);
         while (bool_bitboard(theboard)) {
             let index = pop_lsb_index(theboard);
-            opening_res -= piece_val_map(piece, index, 1);
-            endgame_res -= piece_val_map(piece, index, 0);
+            opening_res -= piece_val_map(piece + 6, index, 1);
+            endgame_res -= piece_val_map(piece + 6, index, 0);
         }
     }
 
