@@ -850,6 +850,81 @@ book_games = [
     "1. Nf3 d5 2. b3",
     "1. Nf3 d5 2. c4",
     "1. Nf3 d5 2. g3",
+
+    // Scandinavian
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Nf6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Bd7",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Be6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 e6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 c6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Nc6",
+    // Ruy lopex
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Nxe5 Nxe5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Nxe5 Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 Be7 7. Nxe5 Nxe5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 Be7 7. Nc3 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 Be7 7. d4 exd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 f6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 b5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Bxc6 dxc6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. dxe5 Nxb5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Ba4 exd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 a6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nxe5 Nxe5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nxe5 Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 Bb6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nc3 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nc3 Nd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nc3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. c3 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. Nbd2 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. Bxc6 dxc6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bd6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3",
+    // Italian
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. Nbd2",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. c3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxd4 6. Qxd4 Bd6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxd4 6. Qxd4 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxd4 6. Qxd4 d5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. Nxc6 bxe6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. Nxc6 dxe6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. O-O d5 7. Bb5 Bd7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. O-O d5 7. Bb3 Nxd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. O-O d5 7. Re1 Nxd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 d6 5. Nc3 Bg4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 d6 5. O-O Bg4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 Nxe4 5. dxe5 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 Nxe4 5. d5 Nd6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 Nxe4 5. Nxe5 d5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Bb4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Bb6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Bb6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 h6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. O-O Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. O-O Bg4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. O-O Be6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. d4 exd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. d4 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. d4 Nxd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. h3 Be7",
+    // Scotch games
+    // French
+    // Caro cann
 ];
 
 function book_move() {
@@ -1053,7 +1128,7 @@ function evaluate_board() { // LOWER BOUND
     return (TURN) ? -res : res;
 }
 
-function score_move(move) { // IMPORTANT
+function score_move(move, attackers) { // IMPORTANT
     if (score_pv && move == pv_table[0][ply]) {
         score_pv = 0;
         return 20000; // was determined best move in prev search
@@ -1064,18 +1139,38 @@ function score_move(move) { // IMPORTANT
     let piece_type = piece % 6;
 
     if (get_move_capture(move)) {
-        let end = 6 * (1 - TURN) + 6;
-        for (let i = 6 * (1 - TURN); i < end; i++) {
+        for (let i = 6 * (1 - TURN); i < 6 * (1 - TURN) + 6; i++) {
             if (get_bit(BOARD[i], target)) {
-                return 10005 - piece_type + 100 * (i % 6 + 1); // + capture_val(piece, i);
+                return 10050 - 10 * piece_type + 100 * (i % 6 + 1) + (attackers[target] > 1);
+                // return 10005 - piece_type + 100 * (i %  6 + 1);
             }
         }
         // En passant
         return 10105;
     }
     if (move == killer_moves[0][ply]) { return 9000; }
-    else if (move == killer_moves[1][ply]) { return 8000; }
-    return history_moves[piece][target]; 
+    if (move == killer_moves[1][ply]) { return 8000; }
+    return Math.max(7000, history_moves[piece][target]); 
+}
+
+function order_moves(moves) {
+    let res = [];
+    let attackers = new Array(64).fill(0);
+    for (let i = 0; i < moves.length; i++) {
+        if (get_move_capture(moves[i])) {
+            attackers[get_move_target(moves[i])]++;
+        }
+    }
+
+    for (let i = 0; i < moves.length; i++) {
+        let entry = [score_move(moves[i], attackers), moves[i]];
+        res.push(entry);
+    }
+    res.sort(function(a, b) { return b[0] - a[0]; });
+    for (let i = 0; i < res.length; i++) {
+        res[i] = res[i][1];
+    }
+    return res;
 }
 
 function enable_pv_scoring(moves) {
@@ -1088,19 +1183,6 @@ function enable_pv_scoring(moves) {
             break;
         }
     }
-}
-
-function order_moves(moves) {
-    let res = [];
-    for (let i = 0; i < moves.length; i++) {
-        let entry = [score_move(moves[i]), moves[i]];
-        res.push(entry);
-    }
-    res.sort(function(a, b) { return b[0] - a[0]; });
-    for (let i = 0; i < res.length; i++) {
-        res[i] = res[i][1];
-    }
-    return res;
 }
 
 // SEARCH -----------------------------------------------------------------------------------------------------------------------------------------------
@@ -1228,10 +1310,8 @@ function best_eval(depth, alpha, beta) {
         }
 
         if (eval > alpha) {
-            hash_flag = 1; // exact
-
             if (!get_move_capture(move)) {
-                history_moves[get_move_piece(move)][get_move_target(move)] += depth;
+                history_moves[get_move_piece(move)][get_move_target(move)] += depth * depth;
             }
             alpha = eval;
             hash_flag = 1; found_pv = 1;

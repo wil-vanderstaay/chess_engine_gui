@@ -157,7 +157,6 @@ function basic_best_eval_captures(alpha, beta, depth) {
         // Copy state
         let cb = copy_board(BOARD);
         let cc = CASTLE;
-        let cg = GAMEPHASE;
         let copy_en = EN_PASSANT_SQUARE;
         let copy_turn = TURN;
         let copy_hash = copy_bitboard(hash_key);
@@ -174,7 +173,6 @@ function basic_best_eval_captures(alpha, beta, depth) {
         // Reset state
         BOARD = cb;
         CASTLE = cc;
-        GAMEPHASE = cg;
         EN_PASSANT_SQUARE = copy_en;
         TURN = copy_turn;
         hash_key = copy_hash;
@@ -206,7 +204,6 @@ function basic_best_eval(depth, alpha, beta) {
         // Copy state
         let cb = copy_board(BOARD);
         let cc = CASTLE;
-        let cg = GAMEPHASE;
         let copy_en = EN_PASSANT_SQUARE;
         let copy_turn = TURN;
         let copy_hash = copy_bitboard(hash_key);
@@ -224,7 +221,6 @@ function basic_best_eval(depth, alpha, beta) {
         // Reset state
         BOARD = cb;
         CASTLE = cc;
-        GAMEPHASE = cg;
         EN_PASSANT_SQUARE = copy_en;
         TURN = copy_turn;
         hash_key = copy_hash;

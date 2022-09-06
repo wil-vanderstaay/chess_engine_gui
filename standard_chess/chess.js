@@ -1663,7 +1663,7 @@ function override_depth() {
     alert("Depth updated");
 }
 
-async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=5, aiGame=false) { // default player vs. ai   
+async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6, aiGame=false) { // default player vs. ai   
     let temp = document.getElementById("fen").value;
     if (temp) { fen = temp; }
     if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; } 
