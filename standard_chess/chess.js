@@ -1684,6 +1684,7 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     hash_key = init_hash();
 
     display_board();
+    initialise_ai_constants();
 
     if (aiGame) {
         while (true) {
