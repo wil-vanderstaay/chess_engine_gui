@@ -1065,9 +1065,8 @@ function init_hash() {
     for (let i = 0; i < 12; i++) {
         let b = copy_bitboard(BOARD[i]);
         while (bool_bitboard(b)) {
-            let square = lsb_index(b);
+            let square = pop_lsb_index(b);
             res = xor_bitboards(res, ZOB_TABLE[square][i]);
-            pop_bit(b, square);
         }
     }
     if (TURN) { res = xor_bitboards(res, ZOB_TABLE[64]); }
@@ -1150,7 +1149,7 @@ function score_move(move, attackers) { // IMPORTANT
     }
     if (move == killer_moves[0][ply]) { return 9000; }
     if (move == killer_moves[1][ply]) { return 8000; }
-    return Math.max(7000, history_moves[piece][target]); 
+    return Math.min(7000, history_moves[piece][target]); 
 }
 
 function order_moves(moves) {
@@ -1300,27 +1299,27 @@ function best_eval(depth, alpha, beta) {
         TURN = copy_turn;
         hash_key = copy_hash;
         
-        if (eval >= beta) { // Opponent response too stong, snip this move
-            HASH_TABLE.set(depth, 2, eval);
-            if (!get_move_capture(move)) {
-                killer_moves[1][ply] = killer_moves[0][ply];
-                killer_moves[0][ply] = move;
-            }
-            return beta;
-        }
-
         if (eval > alpha) {
             if (!get_move_capture(move)) {
                 history_moves[get_move_piece(move)][get_move_target(move)] += depth * depth;
             }
             alpha = eval;
-            hash_flag = 1; found_pv = 1;
+            hash_flag = 1;
 
             pv_table[ply][ply] = move; // write PV move
             for (let next_ply = ply + 1; next_ply < pv_length[ply + 1]; next_ply++) { 
                 pv_table[ply][next_ply] = pv_table[ply + 1][next_ply]; 
             }
             pv_length[ply] = pv_length[ply + 1];
+
+            if (eval >= beta) { // Opponent response too stong, snip this move
+                HASH_TABLE.set(depth, 3, eval);
+                if (!get_move_capture(move)) {
+                    killer_moves[1][ply] = killer_moves[0][ply];
+                    killer_moves[0][ply] = move;
+                }
+                return beta;
+            }
         }        
     }
     
