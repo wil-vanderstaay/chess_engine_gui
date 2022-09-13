@@ -6,6 +6,8 @@ using namespace std;
 #include <chrono>
 using namespace std::chrono;
 
+#include <cstdlib>
+
 // ------------------------------ CONSTANTS ------------------------------
 
 #define U64 unsigned long long
@@ -368,13 +370,13 @@ void create_board(string fen) {
             int j = 3;
             while (fen[i + j] != ' ') {
                 if (fen[i + j] == 'K') {
-                    CASTLE &= 1;
+                    CASTLE |= 1;
                 } else if (fen[i + j] == 'Q') {
-                    CASTLE &= 2;
+                    CASTLE |= 2;
                 } else if (fen[i + j] == 'k') {
-                    CASTLE &= 4;
+                    CASTLE |= 4;
                 } else if (fen[i + j] == 'q') {
-                    CASTLE &= 8;
+                    CASTLE |= 8;
                 }
                 j++;
             }
@@ -577,22 +579,22 @@ int do_move(int move, int capture_only=0) {
     } else if (get_move_castle(move)) {
         if (target == 62) {
             pop_bit(BOARD[3], 63);
-            pop_bit(BOARD[3], 61);
+            set_bit(BOARD[3], 61);
             HASH ^= ZOB_SQUARE[63][3];
             HASH ^= ZOB_SQUARE[61][3];
         } else if (target == 58) {
             pop_bit(BOARD[3], 56);
-            pop_bit(BOARD[3], 59);
+            set_bit(BOARD[3], 59);
             HASH ^= ZOB_SQUARE[56][3];
             HASH ^= ZOB_SQUARE[59][3];
         } else if (target == 6) {
             pop_bit(BOARD[9], 7);
-            pop_bit(BOARD[9], 5);
+            set_bit(BOARD[9], 5);
             HASH ^= ZOB_SQUARE[7][9];
             HASH ^= ZOB_SQUARE[5][9];
         } else if (target == 2) {
             pop_bit(BOARD[9], 0);
-            pop_bit(BOARD[9], 3);
+            set_bit(BOARD[9], 3);
             HASH ^= ZOB_SQUARE[0][9];
             HASH ^= ZOB_SQUARE[3][9];
         }
@@ -1088,7 +1090,7 @@ int best_eval(int depth, int alpha, int beta) {
         repitition_index--;
         restore_board();
 
-        if (score > alpha) {
+        if (eval > alpha) {
             flag = 0;
             alpha = eval;
             if (!get_move_capture(move)) {
@@ -1143,6 +1145,49 @@ int search(int depth) {
     return eval;
 }
 
+void play_game(string start_fen, int total_ply, int depth) {
+    create_board(start_fen);
+    print_board();
+
+    string pgn = "";
+    for (int i = 0; i < total_ply; i++) {
+        search(depth);
+
+        if (i % 2 == 0) { pgn.append(to_string(i / 2 + 1)); pgn.append(". "); }
+        pgn.append(get_move_desc(PV_TABLE[0][0]));
+        pgn.append(" ");
+
+        do_move(PV_TABLE[0][0]);
+        print_board();
+    }
+    printf("%s\n", pgn.c_str());
+}
+
+// ------------------------------ PERF TEST ------------------------------
+
+int perft(int depth, int print=1) {
+    if (depth == 0) { return 1; }
+    
+    int res = 0;
+    moves move_list[1];
+    generate_moves(move_list);
+    for (int i = 0; i < move_list -> count; i++) {
+        int move = move_list -> moves[i];
+        copy_board();
+        if (!do_move(move)) {
+            continue;
+        }
+        int start_res = res;
+        res += perft(depth - 1, 0);   
+
+        if (print) {
+            printf("%s\t->\t%d\n", get_move_desc(move).c_str(), res - start_res);
+        }
+        restore_board();
+    }
+    return res;
+}
+
 // ------------------------------ MAIN ------------------------------
 
 void initialise() {
@@ -1152,20 +1197,11 @@ void initialise() {
     initialise_hash_table();
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 
     initialise();
 
-    string position = "r1bqkbnr/pp1p1ppp/2n1p3/2p5/4P3/3B1N2/PPPP1PPP/RNBQK2R w KQkq - 0 1";
-    position = "r1bqkb1r/pp1p1ppp/2n1pn2/1Bp5/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1";
-    printf("%s\n", position.c_str());
-    
-    create_board(start_position);
-    print_board();
-
-    // search(5);
-    best_eval_captures(5, -infinity, infinity);
-    printf("%d\n", NODES);
+    play_game(start_position, 50, 6);
 
     return 0;
 }
