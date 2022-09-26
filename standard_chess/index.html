@@ -23,7 +23,7 @@
 
             <div style="float: left; margin-left: 20px; margin-top: 1px; width: 80px; height: 93vh; text-align: center;" id="loading"></div>
 
-            <div style="float: left; margin-left: 20px; margin-top: 40px;">
+            <div style="float: left; margin-left: 20px; margin-top: 20px;">
                 <div style="text-align: center;">
                     <input type="button" value="Undo move" onclick="undo_move()">
                     <br>
@@ -33,10 +33,14 @@
                     <input style="width:100px; height:40px;" type="button" value="Black" onclick="start_game(false)">
                     <input style="width:100px; height:40px;" type="button" value="AI vs. AI" onclick="start_game(true, null, 5, true)">
                     <br><br>
+                    <input type="button" value="Daily puzzle" onclick="load_daily_puzzle()">
+                    <input id="stockfish" style="width: 85px; margin-left: 20px; color:#808080;" placeholder="Stockfish level" type="text">
+                    
+                    <br><br>
                     
                     <input type="button" value="Copy fen" onclick="get_fen()">
                     <input type="button" value="Copy pgn" onclick="get_pgn()">
-                    <input id="fen" style="width: 129px; margin-left: 20px; color:#808080;" placeholder="Insert fen" type="text">
+                    <input id="fen" style="width: 129px; margin-left: 20px; color:#808080;" placeholder="Load fen" type="text">
                     <br>
                     
                     <h3>Endgame:</h3>
@@ -81,7 +85,12 @@
                     load_endgame();
                 }
             });
-
+            let stockfish = document.getElementById("stockfish");
+            stockfish.addEventListener("keypress", function(event) {
+                if (event.key === "Enter") {
+                    play_stockfish();
+                }
+            });
             let book = document.getElementById("book_endgame");
             book.addEventListener("keypress", function(event) {
                 if (event.key === "Enter") {

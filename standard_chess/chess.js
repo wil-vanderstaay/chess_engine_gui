@@ -94,6 +94,15 @@ function get_move_desc(move, all_moves) { // all_moves for specific desc, eg. Nb
     return res;
 }
 
+function get_desc_move(move_desc) {
+    let moves = generate_pseudo_moves();
+    for (let i = 0; i < moves.length; i++) {
+        let desc = get_move_desc(moves[i], moves);
+        if (move_desc == desc) { return moves[i]; }
+    }
+    return null;
+}
+
 // CASTLE ----------------------------------------------------------------------------------------------------------------------
 /*
     Encoding
@@ -1485,6 +1494,57 @@ function play_fen(whiteDown) {
     start_game(whiteDown, fen);
 }
 
+function load_daily_puzzle() {
+    let req = new XMLHttpRequest();
+    req.open("GET", "https://lichess.org/api/puzzle/daily");
+    req.send();
+    req.onload = () => {
+        if (req.status == 200) {
+            let res = JSON.parse(req.response);
+            let pgn = res.game.pgn.split(" ");
+
+            prepare_game(!(pgn.length % 2));
+
+            let move;
+            for (let i = 0; i < pgn.length; i++) {
+                move = get_desc_move(pgn[i]);
+                if (!do_move(move)) {
+                    return;
+                }
+
+                GAME_MOVES.push(pgn[i]);
+                showLines();         
+                display_board();
+                highlightLastMove(move);
+            } 
+            doHumanMove();
+        }
+    }
+}
+
+function play_stockfish() {
+    let level = document.getElementById("stockfish").value;
+
+    // https://lichess.org/api/account -H "Authorization: Bearer lip_DihbYxS1QNkd7XA0Kq4T
+    // lip_DihbYxS1QNkd7XA0Kq4T
+
+    let req = new XMLHttpRequest();
+    req.open("POST", "https://lichess.org/api/challenge/ai");
+    req.send({
+        level: 1,
+        days: 2,
+        variant: "standard"
+    });
+    req.onload = () => {
+        let res = JSON.parse(req.response);
+        if (req.status == 200) {
+            console.log(res);
+        } else {
+            console.log("ERROR -> " + String(res.error));
+        }
+    }
+}
+
 function get_game_moves() {
     let temp = "";
     for (let i = 0; i < GAME_MOVES.length; i++) {
@@ -1663,18 +1723,11 @@ function override_depth() {
     alert("Depth updated");
 }
 
-async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6, aiGame=false) { // default player vs. ai   
-    let temp = document.getElementById("fen").value;
-    if (temp) { fen = temp; }
-    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; } 
+function prepare_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6) {
     DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_HASH = [];
     GAME_MOVES = [];
-
-    if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
-        GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
-    }
 
     PLAYER_WHITE = whiteDown;
     LOOKAHEAD = startLookahead;
@@ -1685,6 +1738,18 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
 
     display_board();
     initialise_ai_constants();
+}
+
+async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6, aiGame=false) { // default player vs. ai   
+    let temp = document.getElementById("fen").value;
+    if (temp) { fen = temp; }
+    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; } 
+    
+    prepare_game(whiteDown, fen, startLookahead);
+
+    if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
+        GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
+    }
 
     if (aiGame) {
         while (true) {

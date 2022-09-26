@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstdlib>
-#include <algorithm>
 
 /* 
  * WHOLE BOARD
@@ -116,7 +115,7 @@ int navigate_carry(int source, int target, int fast_move=1) {
     int row_diff = abs(target_row - source_row);
     int col_diff = abs(target_col - source_col);
     int row_direction = target_row > source_row ? 1 : -1;
-    int col_direction = target_col > source_col > 0 ? 1 : -1;
+    int col_direction = target_col > source_col ? 1 : -1;
 
     int keys[2] = {col_direction, row_direction * row_diff * SIZE};
     if ((source_row % 2 && !(source_col % 2)) || row_diff <= 2) {
@@ -206,11 +205,14 @@ void do_move(int turn, int source, int target, int piece, int capture=0, int cas
   printf("\n\n-----------------------------------------------------------------------------------------------------------------------\n\n");
 }
 
-int md[10][7] = {
+int md[12][7] = {
+    4, 6, 11, 0, 1, 0, 0, // O-O
+
     35, 18, 1, 1, 0, 0, 0,  // Nxc6
     45, 21, 4, 1, 0, 0, 0,  // Qxf6
     35, 20, 1, 1, 0, 0, 0,  // Nxe6
     45, 36, 4, 1, 0, 0, 0,  // Qxe4
+    45, 27, 4, 1, 0, 0, 0,  // Qxd5
     61, 25, 2, 0, 0, 0, 0,  // Bb5
 // };
 
