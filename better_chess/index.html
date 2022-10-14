@@ -20,19 +20,32 @@
     <body>
         <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
             <div id="chess-board"></div>
+            
+            <div style="outline: 2px solid black; padding: 2px; margin-left: 20px; width: 70px; height: 94vh;">
+                <button onclick="undo_move()" style="height: 60px; width: 70px;"><img draggable="false" style="width: 36px; height: 36px;" src="../chess_piece_images/undo.png"></button>
+                <button onclick="start_game(true)" style="height: 60px; width: 70px;"><img draggable="false" style="width: 40px; height: 40px;" src="../chess_piece_images/0.png"></button>
+                <button onclick="start_game(false)" style="height: 60px; width: 70px;"><img draggable="false" style="width: 40px; height: 40px;" src="../chess_piece_images/6.png"></button>
+                <br></br>
+                <button onclick="get_fen()" style="height: 30px; width: 70px;">Fen</button>
+                <button onclick="get_pgn()" style="height: 30px; width: 70px;">PGN</button>
+                <br></br>
+                <button onclick="upload_game()" style="height: 40px; width: 70px;">Load game</button>
+                <br></br>
+                <button onclick="play_rand_endgame(false)" style="height: 50px; width: 70px;"><img draggable="false" style="width: 48px; height: 40px;" src="../chess_piece_images/dice.png"></button>
+                <button onclick="play_rand_endgame(true)" style="height: 50px; width: 70px;"><img draggable="false" style="width: 40px; height: 34px;" src="../chess_piece_images/book.png"></button>
+                <br></br>
+            </div>
         </div>
+        <div id="stored_fen"></div>
     </body>
 
     <script src="./ai.js"></script>
     <script src="./chess.js"></script>
     <script>
-
         function test() {
             display_board();
             doHumanMove();
-            console.log("RESIZE");
         }
-
         window.onresize = test;
     </script>
 

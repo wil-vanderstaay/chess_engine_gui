@@ -1023,6 +1023,139 @@ function finish() {
 
 // HTML ----------------------------------------------------------------------------------------------------------------------
 
+function play_rand_endgame(book) {
+    let endgames = [
+        ["6k1/5p2/6p1/8/7p/8/6PP/6K1 b - - 0 0", "Black"], // 3p vs 2p
+        ["3k4/2n2B2/1KP5/2B2p2/5b1p/7P/8/8 b - - 0 0", "White"], // 2B vs BN
+        ["4R3/1k6/1p2P1p1/p7/4r3/1P1r4/1K6/2R5 w - - 0 0", "Equal"], // 2R vs 2R
+        ["8/8/7k/8/8/8/5q2/3B2RK b - - 0 1", "Black"], // Q vs RB
+        ["8/6k1/8/R7/7K/1P6/5r2/8 b - - 0 1", "Equal"], // R1P vs R                     #5
+        ["8/7p/6p1/5k2/7N/8/4KP2/8 b - - 0 0", "Equal"], // N1P vs 2P                   
+        ["6k1/3R4/5Kp1/6r1/4P3/8/8/8 b - - 0 0", "Equal"], // R1P vs R1P
+        ["8/1k6/8/5NP1/8/2p3K1/8/r7 w - - 0 51", "Black"], // N1P vs R1P
+        ["8/1r4k1/3R1ppp/1p6/2p4P/2P5/1P4PK/8 b - - 0 43", "Equal"], // R5P vs R4P
+        ["1r6/8/p4kp1/P1KP3p/8/7P/4B1P1/8 b - - 0 43", "Equal"], // B4P v R3P           #10
+        ["8/8/2R2pk1/3r3p/1P3P1K/8/7P/8 w - - 0 47", "Equal"], // R3P v R2P
+        ["8/5pkp/1n4p1/1P6/3K2P1/2N4P/8/8 w - - 0 70", "White"], // N vs. N
+        ["8/8/7B/8/8/3p4/6Kp/3k1n2 w - - 0 0", "Equal"], // B vs. N
+        ["2r1r3/5k2/3p3p/pp6/4P1PP/3P3Q/1P6/7K w - - 0 34", "White"], // Q v RR
+        ["8/pp2k3/2p3B1/3p2P1/3n2K1/8/PPP5/8 b - - 0 0", "White"], // B vs. N           #15
+        ["3k4/2p2p2/1p5p/p1p1P1p1/P1Pn2P1/1P3P1P/1B3K2/8 w - - 0 30", "Equal"], // B vs. N
+        ["6b1/6p1/8/5kPP/K7/P1P5/8/8 w - - 0 50", "Equal"], // B vs. 3p
+        ["6k1/1p3pp1/p2np2p/P7/2P2P2/1P5P/4N1P1/6K1 w - - 0 36", "White"], // N vs. N
+        ["1n6/4k2p/p3ppp1/1pPp4/3P1PP1/3NP3/P3K2P/8 w - - 0 27", "White"], // N+pawns vs. N+pawns
+        ["8/8/8/pp1k1p2/7p/1PK1PP1P/8/8 w - - 0 52", "Equal"], // 4p vs. 4p             #20
+        ["R7/8/8/8/6K1/5p2/5Pk1/4r3 w - - 0 1", "Equal"], // R+p vs. R+p
+        ["8/8/8/p1k2K1R/5P1P/8/4p1n1/8 w - - 0 1", "Equal"], // R vs. N (2p)
+        ["8/pp4pp/2pn1k2/3p1p2/3P1K2/6PP/PPP1B1P1/8 w - - 0 24", "Equal"], // B vs. N
+        ["4n3/p3k3/1p4P1/2pK4/P2p4/1P6/2P1B3/8 w - - 0 49", "White"], // B vs. N
+        ["8/5k2/4p2p/4P3/B1np1KP1/3b4/8/2B5 b - - 0 1", "Equal"], // B+N vs. 2B         #25
+        ["8/1p4p1/5p1p/1k3P2/6PP/3KP3/8/8 w - - 0 50", "White"] // K+P
+        ["8/8/1p1k4/5ppp/PPK1p3/6P1/5PP1/8 b - - 0 0", "Black"] // K+P
+    ]
+    let index = Math.floor(Math.random() * endgames.length);
+    let fen = endgames[index][0];
+    if (book) { fen = "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0"; } // BN vs K 
+    i = 0;
+    while (i < fen.length) {
+        if (fen[i] == " ") {
+            PLAYER_WHITE = fen[i + 1] == "w";
+            break;
+        }
+        i++;
+    }
+    document.getElementById("stored_fen").value = "";
+    start_game(PLAYER_WHITE, fen);
+}
+
+function undo_move() {
+    GAME.pop();
+    GAME.pop();
+    BOARD = GAME[GAME.length - 1];
+    if (!BOARD) { return start_game(PLAYER_WHITE); }
+    GAME.pop(); // pushed back on in display_board
+
+    GAME_MOVES.pop();
+    GAME_MOVES.pop();
+
+    display_board();
+    doHumanMove();
+}
+
+function copy_to_clipboard(text) {
+    let dummy = document.createElement("textarea");
+    document.body.appendChild(dummy);
+    dummy.value = text;
+    dummy.select();
+    document.execCommand("copy");
+    document.body.removeChild(dummy);
+
+    alert("Copied to clipboard");
+}
+
+function get_pgn() {
+    let start = '[Event "?"]\n[Site "?"]\n[Date "????.??.??"]\n[Round "?"]\n[White "?"]\n[Black "?"]\n[Result "*"]\n\n';
+    copy_to_clipboard(start + get_game_moves() + "*");
+}
+
+function get_fen() {
+    let values; let castle; let en_pass;
+    let start; let direction;
+    if (PLAYER_WHITE) {
+        values = "PNBRQKpnbrqk";
+        castle = (get_castle_pk(CASTLE) ? "K" : "") + (get_castle_pq(CASTLE) ? "Q" : "") + (get_castle_ak(CASTLE) ? "k" : "") + (get_castle_aq(CASTLE) ? "q" : "");
+        if (EN_PASSANT_SQUARE) {
+            en_pass = String.fromCharCode(97 + EN_PASSANT_SQUARE % 8) + (((64 - EN_PASSANT_SQUARE) >> 3) + 1);
+        } else {
+            en_pass = "-";
+        }
+        start = 0; direction = 1;
+    } else {
+        values = "pnbrqkPNBRQK";
+        castle = (get_castle_pk(CASTLE) ? "k" : "") + (get_castle_pq(CASTLE) ? "q" : "") + (get_castle_ak(CASTLE) ? "K" : "") + (get_castle_aq(CASTLE) ? "Q" : "");
+        if (EN_PASSANT_SQUARE) {
+            en_pass = String.fromCharCode(97 + 7 - EN_PASSANT_SQUARE % 8) + ((EN_PASSANT_SQUARE >> 3) + 1);
+        } else {
+            en_pass = "-";
+        }
+        start = 7; direction = -1;
+    }
+    if (!castle.length) { castle = "-"; }
+    let res = ""; let count = 0;
+    let i = start;
+    while (0 <= i && i <= 7) {
+        let j = start;
+        while (0 <= j && j <= 7) {
+            let p = 8 * i + j;
+            if (get_bit(BOARD[14], p)) {
+                if (count) {
+                    res += (count);
+                }
+                count = 0;
+                for (let k = 0; k < 12; k++) {
+                    if (get_bit(BOARD[k], p)) {
+                        res += values[k];
+                    }
+                }
+            } else {
+                count++;
+            }
+            j += direction;
+        }
+        if (count) {
+            res += (count);
+        }
+        count = 0;
+        res += "/";
+
+        i += direction;
+    }
+
+    res = res.slice(0, res.length - 1) + " " + (PLAYER_WHITE ^ TURN ? "w" : "b") + " " + castle + " " + en_pass + " 0 1";
+    copy_to_clipboard(res);
+    return res;
+}
+
 function get_game_moves() {
     let temp = "";
     for (let i = 0; i < GAME_MOVES.length; i++) {
@@ -1036,6 +1169,45 @@ function get_game_moves() {
 
 function get_move_number() {
     return (GAME_MOVES.length >> 1) + 1;
+}
+
+function flip_fen(fen) {
+    let res = "";
+    let i = 0;
+    while (i < fen.length) {
+        let row = "";
+        while (i < fen.length && fen[i] != "/" && fen[i] != " ") {
+            row += fen[i];
+            i++;
+        }
+        let rev_row = "";
+        for (let j = row.length - 1; j >= 0; j--) {
+            rev_row += row[j];
+        }
+        res = rev_row + res;
+        if (fen[i] == " ") {
+            res += " " + fen[i + 1] + " ";
+            if (fen[i + 3] != "-") {
+                while (fen[i + 3] != " ") {
+                    res += fen[i + 3];
+                    i++;
+                }
+            } else { res += "-"; }
+            res += " ";
+            if (fen[i + 4] != "-") {
+                let letters = {"a": "h", "b": "g", "c": "f", "d": "e", "f": "c", "g": "b", "h": "a"};
+                res += letters[fen[i + 4]];
+                let new_num = 9 - parseInt(fen[i + 5]);
+                res += new_num.toString();
+            } else { res += "-"; }
+            res += " " + fen[fen.length - 3] + " " + fen[fen.length - 1];
+            return res;
+        } else {
+            res = fen[i] + res;
+        }
+        i++;
+    } 
+    return res;
 }
 
 function make_table(player_white) {
@@ -1451,6 +1623,14 @@ function pieceDrag(div, pos, pieceTurn) {
     }
 }
 
+function upload_game() {
+    let fen = prompt("Enter fen:");
+    if (fen && fen.length < 19) { 
+        fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
+    }
+    start_game(true, fen);
+}
+
 function prepare_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6) {
     DISABLE_LOOKAHEAD = false;
     GAME = [];
@@ -1468,36 +1648,22 @@ function prepare_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBN
     initialise_ai_constants();
 }
 
-async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6, aiGame=false) { // default player vs. ai   
-    let temp = document.getElementById("fen")
-    if (temp) { fen = temp.value; }
+async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6) {
+    let stored_fen = document.getElementById("stored_fen").value;
+    if (fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" && stored_fen) { fen = stored_fen; }
     if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; } 
-    
+    document.getElementById("stored_fen").value = fen;
+
     prepare_game(whiteDown, fen, startLookahead);
 
     if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
         GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
     }
 
-    if (aiGame) {
-        while (true) {
-            if (!doAiMove()) { return; }
-            await delay(0.5);
-            if (!doAiMove(true)) { return; }
-            await delay(0.5);
-        }
-    } else {
-        if (TURN) {
-            doAiMove();
-        }
-        doHumanMove();
+    if (TURN) {
+        doAiMove();
     }
-}
-
-async function delay(n) {
-    await new Promise(function(resolve){
-        setTimeout(resolve, n * 1000);
-    });
+    doHumanMove();
 }
 
 let PAWN_ATTACK;
