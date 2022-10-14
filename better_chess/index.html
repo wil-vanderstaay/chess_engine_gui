@@ -7,13 +7,13 @@
             .chess-board { border-spacing: 0; user-select: none; }
             .chess-board th { padding: .25em; }
             .chess-board table, td { border: 1px solid #000; }
-            .chess-board td { width: min(11vw, 10.9vh); height: min(11vw, 10.9vh);} /* font-size: 32px; line-height: 0;}*/
+            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh);} /* font-size: 32px; line-height: 0;}*/
 
             /* RED: #f1d9c0 #a97a65;    BLUE: #82EEFD #63C5DA;  GREEN: */
             .chess-board .light { background: #f1d9c0; }
             .chess-board .dark { background: #a97a65; }
 
-            .chess-piece { padding-left: 5px; position: absolute; } /* cursor: move; font-size: 64px; padding-left: 8px; position: absolute; */
+            .chess-piece { position: absolute; } /* cursor: move; font-size: 64px; padding-left: 8px; position: absolute; */
             .move-circle { padding-left: 20px; }
         </style>
     </head>
@@ -21,19 +21,21 @@
         <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
             <div id="chess-board"></div>
             
-            <div style="outline: 2px solid black; padding: 2px; margin-left: 20px; width: 70px; height: 94vh;">
-                <button onclick="undo_move()" style="height: 60px; width: 70px;"><img draggable="false" style="width: 36px; height: 36px;" src="../chess_piece_images/undo.png"></button>
-                <button onclick="start_game(true)" style="height: 60px; width: 70px;"><img draggable="false" style="width: 40px; height: 40px;" src="../chess_piece_images/0.png"></button>
-                <button onclick="start_game(false)" style="height: 60px; width: 70px;"><img draggable="false" style="width: 40px; height: 40px;" src="../chess_piece_images/6.png"></button>
+            <div style="outline: 2px solid black; padding: 2px; margin-left: 20px; width: 60px; height: 94vh;">
+                <button onclick="undo_move()" style="height: 50px; width: 60px;"><img draggable="false" style="width: 36px; height: 36px;" src="../chess_piece_images/undo.png"></button>
+                <button onclick="start_game(true)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px;" src="../chess_piece_images/0.png"></button>
+                <button onclick="start_game(false)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px;" src="../chess_piece_images/6.png"></button>
                 <br></br>
-                <button onclick="get_fen()" style="height: 30px; width: 70px;">Fen</button>
-                <button onclick="get_pgn()" style="height: 30px; width: 70px;">PGN</button>
+                <button onclick="get_fen()" style="height: 30px; width: 60px;">Fen</button>
+                <button onclick="get_pgn()" style="height: 30px; width: 60px;">PGN</button>
                 <br></br>
-                <button onclick="upload_game()" style="height: 40px; width: 70px;">Load game</button>
+                <button onclick="upload_game()" style="height: 40px; width: 60px;">Load game</button>
                 <br></br>
-                <button onclick="play_rand_endgame(false)" style="height: 50px; width: 70px;"><img draggable="false" style="width: 48px; height: 40px;" src="../chess_piece_images/dice.png"></button>
-                <button onclick="play_rand_endgame(true)" style="height: 50px; width: 70px;"><img draggable="false" style="width: 40px; height: 34px;" src="../chess_piece_images/book.png"></button>
-                <br></br>
+                <button onclick="play_rand_endgame(false)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 46px; height: 38px;" src="../chess_piece_images/dice.png"></button>
+                <button onclick="play_rand_endgame(true)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 40px; height: 34px;" src="../chess_piece_images/book.png"></button>
+                <!-- <br></br> -->
+                <div style="width: 58px; height: 205px; text-align: center;" id="loading"></div>
+
             </div>
         </div>
         <div id="stored_fen"></div>

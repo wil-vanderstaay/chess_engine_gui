@@ -1348,7 +1348,7 @@ let width;
 function display_board() {
     let table = document.getElementById("chess-table");
     let s = document.getElementById("s0").getBoundingClientRect();
-    min_left = s.left;
+    min_left = s.left + 5;
     min_top = s.top + 5;
     width = s.right - s.left;
 
@@ -1593,12 +1593,9 @@ function pieceDrag(div, pos, pieceTurn) {
                 let message = "LOADING";
                 let res = "";
                 for (let i = 0; i < message.length; i++) {
-                    res += "<h1>" + message[i] + "</h1><br>";
+                    res += "<p>" + message[i] + "</p>";
                 }
-                let loading = document.getElementById("loading")
-                if (loading) {
-                    loading.innerHTML = res.slice(0, res.length - 4);
-                }
+                document.getElementById("loading").innerHTML = res; // .slice(0, res.length - 4);
                 
                 setTimeout(() => {  
 
