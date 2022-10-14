@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <meta charset="UTF-8">
+        <style>            
+            .chess-board { border-spacing: 0; user-select: none; }
+            .chess-board th { padding: .25em; }
+            .chess-board table, td { border: 1px solid #000; }
+            .chess-board td { width: min(11vw, 10.9vh); height: min(11vw, 10.9vh);} /* font-size: 32px; line-height: 0;}*/
+
+            /* RED: #f1d9c0 #a97a65;    BLUE: #82EEFD #63C5DA;  GREEN: */
+            .chess-board .light { background: #f1d9c0; }
+            .chess-board .dark { background: #a97a65; }
+
+            .chess-piece { padding-left: 5px; position: absolute; } /* cursor: move; font-size: 64px; padding-left: 8px; position: absolute; */
+            .move-circle { padding-left: 20px; }
+        </style>
+    </head>
+    <body>
+        <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
+            <div id="chess-board"></div>
+        </div>
+    </body>
+
+    <script src="./ai.js"></script>
+    <script src="./chess.js"></script>
+    <script>
+
+        function test() {
+            display_board();
+            doHumanMove();
+            console.log("RESIZE");
+        }
+
+        window.onresize = test;
+    </script>
+
+</html>
