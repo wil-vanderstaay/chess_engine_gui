@@ -1051,7 +1051,7 @@ function setup_board() {
 }
 
 function add_piece() {
-    let input = window.prompt("W/B then P N B R Q K: ");
+    let input = window.prompt("Add a piece to the board\nW/B then P N B R Q K: ");
     if (!input) { return; }
     input = input.toUpperCase();
     let value = { "P": 0, "N": 1, "B": 2, "R": 3, "Q": 4, "K": 5 };
@@ -1670,11 +1670,12 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 GAME_HASH.push(hash_key);
 
                 let message = "LOADING";
-                let res = "";
+                let res = "<div>";
                 for (let i = 0; i < message.length; i++) {
-                    res += "<p>" + message[i] + "</p>";
+                    res += message[i] + "<br></br>";
                 }
-                document.getElementById("loading").innerHTML = res; // .slice(0, res.length - 4);
+                res += "</div>";
+                document.getElementById("loading").innerHTML = res;
                 
                 setTimeout(() => {  
 
