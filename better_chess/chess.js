@@ -329,7 +329,7 @@ function print_board(board) {
     console.log();
 }
 
-function do_move(move) {
+function do_move(move, ignore_check=false) {
     if (!move) { return false; }
 
     let cb = copy_board(BOARD);
@@ -341,14 +341,9 @@ function do_move(move) {
     let target = get_move_target(move);
     let piece = get_move_piece(move);
 
-    // Move piece
-    pop_bit(BOARD[piece], source);
-    set_bit(BOARD[piece], target);
-    hash_key = xor_bitboards(hash_key, ZOB_TABLE[source][piece]);
-    hash_key = xor_bitboards(hash_key, ZOB_TABLE[target][piece]);
-
     if (get_move_capture(move)) {
-        for (let i = 6 * (TURN ^ 1); i < 6 * (TURN ^ 1) + 6; i++) {
+        // for (let i = 6 * (TURN ^ 1); i < 6 * (TURN ^ 1) + 6; i++) {
+        for (let i = 0; i < 12; i++) {     
             if (get_bit(BOARD[i], target)) {
                 pop_bit(BOARD[i], target);
                 hash_key = xor_bitboards(hash_key, ZOB_TABLE[target][i]);
@@ -356,6 +351,12 @@ function do_move(move) {
             }
         }
     }
+
+    // Move piece
+    pop_bit(BOARD[piece], source);
+    set_bit(BOARD[piece], target);
+    hash_key = xor_bitboards(hash_key, ZOB_TABLE[source][piece]);
+    hash_key = xor_bitboards(hash_key, ZOB_TABLE[target][piece]);
 
     if (get_move_promote(move)) {
         let promote_piece = get_move_promote(move);
@@ -465,7 +466,7 @@ function do_move(move) {
     BOARD[14] = or_bitboards(BOARD[12], BOARD[13]); // board
 
     // Moving into check, reset state
-    if (is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
+    if (!ignore_check && is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
         BOARD = cb;
         CASTLE = cc;
         EN_PASSANT_SQUARE = ce;
@@ -1023,6 +1024,57 @@ function finish() {
 
 // HTML ----------------------------------------------------------------------------------------------------------------------
 
+function run_setup_board() {
+    let button = document.getElementById("setup");
+    if (button.style.backgroundColor == "rgb(187, 224, 174)") {
+        if (count_bits(BOARD[5]) != 1 || count_bits(BOARD[11]) != 1) {
+            alert("Invalid position");
+            setup_board();
+            return;
+        }
+        button.style.backgroundColor = "";
+        TURN = 0;
+        display_board();
+        doHumanMove();
+    } else {
+        button.style.backgroundColor = "#bbe0ae";
+        setup_board();
+    }
+}
+
+function setup_board() {
+    for (let i = 0; i < 64; i++) {
+        if (get_bit(BOARD[14], i)) {
+            pieceDrag(document.getElementById((i)), i, true, true);
+        }
+    }
+}
+
+function add_piece() {
+    let input = window.prompt("W/B then P N B R Q K: ");
+    if (!input) { return; }
+    input = input.toUpperCase();
+    let value = { "P": 0, "N": 1, "B": 2, "R": 3, "Q": 4, "K": 5 };
+    if (input.length != 2 || !Object.keys(value).includes(input[1]) || !"WB".includes(input[0])) { return; }
+
+    promote_piece = (input[0] == "W" ? 0 : 6) + value[input[1]];
+    console.log(promote_piece);
+    for (let i = 0; i < 64; i++) {
+        if (!get_bit(BOARD[14], i)) {
+            set_bit(BOARD[promote_piece], i);
+            set_bit(BOARD[14], i);
+            if (promote_piece < 6) {
+                set_bit(BOARD[12], i);
+            } else {
+                set_bit(BOARD[13], i);
+            }
+            display_board();
+            setup_board();
+            return;
+        }
+    }
+}
+
 function play_rand_endgame(book) {
     let endgames = [
         ["6k1/5p2/6p1/8/7p/8/6PP/6K1 b - - 0 0", "Black"], // 3p vs 2p
@@ -1077,6 +1129,8 @@ function undo_move() {
 
     GAME_MOVES.pop();
     GAME_MOVES.pop();
+    GAME_HASH.pop();
+    GAME_HASH.pop();
 
     display_board();
     doHumanMove();
@@ -1398,7 +1452,9 @@ function doAiMove(differentAi=false) {
     }
 
     let md = get_move_desc(best_move, moves);
+    GAME.push(copy_board(BOARD));
     GAME_MOVES.push(md);
+    GAME_HASH.push(hash_key);
 
     evaluation = Math.round(evaluation + Number.EPSILON);
     if (evaluation < -99900) {
@@ -1462,7 +1518,7 @@ function doHumanMove() {
 
 let SELECTED_PIECE = 64;
 
-function pieceDrag(div, pos, pieceTurn) {   
+function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {   
 
     let pos1 = 0; let pos2 = 0; let pos3 = 0; let pos4 = 0;
     setPosition();
@@ -1520,12 +1576,33 @@ function pieceDrag(div, pos, pieceTurn) {
         let new_pos = 8 * new_row + new_col;
 
         setPosition();
+    
+        if (move_anywhere) {
+            // Get piece value
+            let image = div.getElementsByTagName('img')[0].src;
+            let i = image.length - 1;
+            while (i >= 0 && image[i] != "/") {
+                i--;
+            }
+            let val = "";
+            while (i < image.length && image[i] != ".") {
+                i++;
+                val += image[i];
+            }
+            val = parseInt(val);
+            let m = create_move(pos, new_pos, val, 0, get_bit(BOARD[14], new_pos) ? 1 : 0);
+            TURN = val < 6 ? 0 : 1;
+            if (!PLAYER_WHITE) {
+                TURN ^= 1;
+            }
+            do_move(m, true);
 
-        if (pos == new_pos) {
+            display_board();
+            setup_board();
+        } else if (pos == new_pos) {
             clickMovePiece();
         } else {
             if (!doLegalMove(new_pos)) { // reset piece position
-                console.log("ILL")
                 div.style.top = ((pos >> 3) * width + min_top) + "px";
                 div.style.left = ((pos % 8) * width + min_left) + "px";
             }
@@ -1588,7 +1665,9 @@ function pieceDrag(div, pos, pieceTurn) {
                 move |= 983040; // set promote 15
             }
             if (do_move(move)) {
+                GAME.push(copy_board(BOARD));
                 GAME_MOVES.push(get_move_desc(move, moves));
+                GAME_HASH.push(hash_key);
 
                 let message = "LOADING";
                 let res = "";
@@ -1623,12 +1702,12 @@ function pieceDrag(div, pos, pieceTurn) {
 function upload_game() {
     let fen = prompt("Enter fen:");
     if (fen && fen.length < 19) { 
-        fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
+        fen = START_FEN; 
     }
     start_game(true, fen);
 }
 
-function prepare_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6) {
+function prepare_game(whiteDown, fen=START_FEN, startLookahead=6) {
     DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_HASH = [];
@@ -1645,10 +1724,10 @@ function prepare_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBN
     initialise_ai_constants();
 }
 
-async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", startLookahead=6) {
+async function start_game(whiteDown, fen=START_FEN, startLookahead=6) {
     let stored_fen = document.getElementById("stored_fen").value;
-    if (fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" && stored_fen) { fen = stored_fen; }
-    if (!fen) { fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; } 
+    if (fen == START_FEN && stored_fen) { fen = stored_fen; }
+    if (!fen) { fen = START_FEN; } 
     document.getElementById("stored_fen").value = fen;
 
     prepare_game(whiteDown, fen, startLookahead);
@@ -1662,6 +1741,8 @@ async function start_game(whiteDown, fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB
     }
     doHumanMove();
 }
+
+let START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 let PAWN_ATTACK;
 let KNIGHT_ATTACK;

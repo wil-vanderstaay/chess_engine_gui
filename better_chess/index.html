@@ -26,6 +26,9 @@
                 <button onclick="start_game(true)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px;" src="../chess_piece_images/0.png"></button>
                 <button onclick="start_game(false)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px;" src="../chess_piece_images/6.png"></button>
                 <br></br>
+                <button id="setup" onclick="run_setup_board()" style="height: 30px; width: 60px;">Setup</button>
+                <button onclick="add_piece()" style="height: 30px; width: 60px;">+</button>
+                <br></br>
                 <button onclick="get_fen()" style="height: 30px; width: 60px;">Fen</button>
                 <button onclick="get_pgn()" style="height: 30px; width: 60px;">PGN</button>
                 <br></br>
@@ -33,8 +36,7 @@
                 <br></br>
                 <button onclick="play_rand_endgame(false)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 46px; height: 38px;" src="../chess_piece_images/dice.png"></button>
                 <button onclick="play_rand_endgame(true)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 40px; height: 34px;" src="../chess_piece_images/book.png"></button>
-                <!-- <br></br> -->
-                <div style="width: 58px; height: 205px; text-align: center;" id="loading"></div>
+                <div style="height: 205px; text-align: center; font-size: 12px;" id="loading"></div>
 
             </div>
         </div>

@@ -930,6 +930,8 @@ book_games = [
 function book_move() {
     if (get_move_number() > 10) { // don't book move when loaded fen
         return 0; 
+    } else if (document.getElementById("stored_fen").value == START_FEN) {
+        return false;
     }
 
     let res = [];
