@@ -10,10 +10,11 @@
             .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh);} /* font-size: 32px; line-height: 0;}*/
 
             /* RED: #f1d9c0 #a97a65;    BLUE: #82EEFD #63C5DA;  GREEN: */
-            .chess-board .light { background: #f1d9c0; }
-            .chess-board .dark { background: #a97a65; }
+            .chess-board .light { background: #f1d9c0; color: #a97a65; font-size: 14px;}
+            .chess-board .dark { background: #a97a65; color: #f1d9c0; font-size: 14px;}
 
-            .chess-piece { position: absolute; } /* cursor: move; font-size: 64px; padding-left: 8px; position: absolute; */
+
+            .chess-piece { position: absolute; z-index: 1000; } /* cursor: move; font-size: 64px; padding-left: 8px; position: absolute; */
             .move-circle { padding-left: 20px; }
         </style>
     </head>

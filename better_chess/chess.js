@@ -1266,26 +1266,26 @@ function flip_fen(fen) {
 
 function make_table(player_white) {
     let table = '<table id="chess-table" class="chess-board">';
+    let row_order = player_white ? "87654321" : "12345678";
+    let col_order = player_white ? "abcdefgh" : "hgfedcba";
     for (let row = 0; row < 8; row++) {
-        if (player_white) {
-            table += '<tr><th>' + (8 - row).toString() + '</th>'; 
-        } else {
-            table += '<tr><th>' + (row + 1).toString() + '</th>';  
-        }
+        table += '<tr>';
         for (let col = 0; col < 8; col++) {
             if ((row + col) % 2 == 1) {
                 colour_class = 'dark';    
             } else {
                 colour_class = 'light';
             }
-            table += '<td id="s' + (8 * row + col) + '" class="' + colour_class + '"></td>';
+            table += '<td id="s' + (8 * row + col) + '" class="' + colour_class + '" style="position: relative;">';
+            if (col == 0) {
+                table += '<div style="position: absolute; top: -1px; left: 0px;">' + row_order[row] + '</div>';
+            }
+            if (row == 7) {
+                table += '<div style="position: absolute; bottom: -1px; right: 2px;">' + col_order[col] + '</div>';
+            }
+            table += '</td>';
         }
         table += '</tr>';
-    }
-    if (player_white) {
-        table += '<th></th><th>a</th><th>b</th><th>c</th><th>d</th><th>e</th><th>f</th><th>g</th><th>h</th></table>';
-    } else {
-        table += '<th></th><th>h</th><th>g</th><th>f</th><th>e</th><th>d</th><th>c</th><th>b</th><th>a</th></table>';
     }
     document.getElementById("chess-board").innerHTML = table;
 }
@@ -1395,28 +1395,45 @@ function make_board(fen) {
 }
 
 // Piece position variables
-let min_left;
-let min_top;
+let top_offset = 3;
+let left_offset = 4;
 let width;
+
+function remove_img_div(div) {
+    let i = 0;
+    while (i < div.length - 2) {
+        if (div.slice(i, i + 3) == "img") {
+            let f = i - 2;
+            while (f > 0 && div[f] != "<") {
+                f--;
+            }
+            let l = i + 3;
+            while (l < div.length && div[l] != "<") {
+                l++;
+            }
+            return div.slice(0, f) + div.slice(l + "</div>".length, div.length);
+        }
+        i++;
+    }
+    return div;
+}
 
 function display_board() {
     let table = document.getElementById("chess-table");
     let s = document.getElementById("s0").getBoundingClientRect();
-    min_left = s.left + 5;
-    min_top = s.top + 5;
     width = s.right - s.left;
 
     for (let i = 0; i < 64; i++) {
-        let piece_location = table.rows.item(i >> 3).cells.item(i % 8 + 1);
+        let piece_location = table.rows.item(i >> 3).cells.item(i % 8);
         piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
-        piece_location.innerHTML = "";
-
+        piece_location.innerHTML = remove_img_div(piece_location.innerHTML);
+        
         if (get_bit(BOARD[14], i)) {
             for (let j = 0; j < 12; j++) {
                 if (get_bit(BOARD[j], i)) {
                     let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
                     let piece = '<img draggable="false" style="width: ' + (width - 10) + 'px; height: ' + (width - 10) + 'px;" src="../chess_piece_images/' + (piece_number) + '.png">';
-                    piece_location.innerHTML = '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
+                    piece_location.innerHTML += '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
                     pieceDrag(document.getElementById((i)), i, false);
                     break;
                 }
@@ -1432,8 +1449,8 @@ function highlightLastMove(last_move) {
     let move_source = get_move_source(last_move);
     let move_target = get_move_target(last_move);
 
-    let s_location = table.rows.item(move_source >> 3).cells.item(move_source % 8 + 1);
-    let t_location = table.rows.item(move_target >> 3).cells.item(move_target % 8 + 1);
+    let s_location = table.rows.item(move_source >> 3).cells.item(move_source % 8);
+    let t_location = table.rows.item(move_target >> 3).cells.item(move_target % 8);
 
     s_location.style.background = (s_location.className == "light") ? lcode : dcode;
     t_location.style.background = (t_location.className == "light") ? lcode : dcode;
@@ -1521,21 +1538,9 @@ let SELECTED_PIECE = 64;
 function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {   
 
     let pos1 = 0; let pos2 = 0; let pos3 = 0; let pos4 = 0;
-    setPosition();
+    div.style.top = (top_offset) + "px";
+    div.style.left = (left_offset) + "px";
     if (pieceTurn) { div.onmousedown = openDragElement; }
-
-    function setPosition() {
-        let rem_top = (div.offsetTop - min_top) % width;
-        let rem_left = (div.offsetLeft - min_left) % width;
-        if (rem_top > width/2) {
-            rem_top -= width;
-        }
-        if (rem_left > width/2) {
-            rem_left -= width;
-        }
-        div.style.top = (div.offsetTop - rem_top) + "px";
-        div.style.left = (div.offsetLeft - rem_left) + "px";
-    }
 
     function openDragElement(e) {
         e = e || window.event;
@@ -1545,7 +1550,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         // Reset board colours
         let table = document.getElementById("chess-table");
         for (let i = 0; i < 64; i++) {
-            let piece_location = table.rows.item(i >> 3).cells.item(i % 8 + 1);
+            let piece_location = table.rows.item(i >> 3).cells.item(i % 8);
             if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
                 piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
             }
@@ -1569,14 +1574,13 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
     function closeDragElement(e) {
         document.onmouseup = null;
         document.onmousemove = null;
-        setPosition();
 
-        let new_row = Math.round((div.offsetTop - min_top) / width);
-        let new_col = Math.round((div.offsetLeft - min_left) / width);
-        let new_pos = 8 * new_row + new_col;
-
-        setPosition();
-    
+        let row_diff = Math.round(div.offsetTop / width);
+        let col_diff = Math.round(div.offsetLeft / width)
+        let new_pos = pos + (row_diff << 3) + col_diff;
+        div.style.top = (width * row_diff + top_offset) + "px";
+        div.style.left = (width * col_diff + left_offset) + "px";
+        
         if (move_anywhere) {
             // Get piece value
             let image = div.getElementsByTagName('img')[0].src;
@@ -1603,8 +1607,8 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
             clickMovePiece();
         } else {
             if (!doLegalMove(new_pos)) { // reset piece position
-                div.style.top = ((pos >> 3) * width + min_top) + "px";
-                div.style.left = ((pos % 8) * width + min_left) + "px";
+                div.style.top = (top_offset) + "px";
+                div.style.left = (left_offset) + "px";
             }
         }
     }
@@ -1615,7 +1619,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         if (SELECTED_PIECE == pos) { return; } // remove selection
 
          // Highlight piece
-         let piece_location = table.rows.item(pos >> 3).cells.item(pos % 8 + 1);
+         let piece_location = table.rows.item(pos >> 3).cells.item(pos % 8);
          piece_location.style.background = (piece_location.className == "light") ? "#bbe0ae" : "#75c15b";
 
         // Determine legal piece moves
@@ -1629,14 +1633,14 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
 
         // Add onclick for doing nothing
         for (let i = 0; i < 64; i++) {
-            let cell = table.rows.item(i >> 3).cells.item(i % 8 + 1);
+            let cell = table.rows.item(i >> 3).cells.item(i % 8);
             if (i == pos) { continue; }
             cell.onclick = function() {
                 SELECTED_PIECE = 64;
                 if (get_bit(BOARD[14], i)) { SELECTED_PIECE = i; }
                 // Reset board colours
                 for (let j = 0; j < 64; j++) {
-                    let piece_location = table.rows.item(j >> 3).cells.item(j % 8 + 1);
+                    let piece_location = table.rows.item(j >> 3).cells.item(j % 8);
                     if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
                         piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
                     }
@@ -1648,7 +1652,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         // Add onclick for legal piece moves
         for (let i = 0; i < move_targets.length; i++) {
             let target = move_targets[i];
-            let move_location = table.rows.item(target >> 3).cells.item(target % 8 + 1);
+            let move_location = table.rows.item(target >> 3).cells.item(target % 8);
 
             move_location.onclick = function() {
                 SELECTED_PIECE = 64;
@@ -1690,7 +1694,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 return true;
             }
             let king_pos = TURN ? lsb_index(BOARD[11]) : lsb_index(BOARD[5]);
-            let king_location = document.getElementById("chess-table").rows.item(king_pos >> 3).cells.item(king_pos % 8 + 1);
+            let king_location = document.getElementById("chess-table").rows.item(king_pos >> 3).cells.item(king_pos % 8);
             king_location.style.background = "#FF0000"; // RED
             setTimeout(() => {
                 king_location.style.background = (king_location.className == "light") ? "#f1d9c0" : "#a97a65";
