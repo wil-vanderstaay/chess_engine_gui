@@ -1146,10 +1146,18 @@ function copy_to_clipboard(text) {
 }
 
 function open_chess_com() {
-    open("https://www.chess.com/analysis?pgn=" + get_game_moves().replaceAll(" ", "%20"));
+    if (document.getElementById("stored_fen").value == START_FEN) {
+        open("https://www.chess.com/analysis?pgn=" + get_game_moves().replaceAll(" ", "%20"));
+    } else {
+        open("https://www.chess.com/analysis?fen=" + get_fen().replaceAll(" ", "%20"));
+    }
 }
 function open_lichess() {
-    open("https://www.lichess.org/analysis/pgn/" + get_game_moves().replaceAll(" ", "_"));
+    if (document.getElementById("stored_fen").value == START_FEN) {
+        open("https://www.lichess.org/analysis/pgn/" + get_game_moves().replaceAll(" ", "_"));
+    } else {
+        open("https://www.lichess.org/analysis/" + get_fen().replaceAll(" ", "_"));
+    }
 }
 
 function get_pgn() {
