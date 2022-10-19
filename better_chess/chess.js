@@ -1147,9 +1147,17 @@ function copy_to_clipboard(text) {
     alert("Copied to clipboard");
 }
 
+function open_chess_com() {
+    open("https://www.chess.com/analysis?pgn=" + get_game_moves().replaceAll(" ", "%20"));
+}
+function open_lichess() {
+    open("https://www.lichess.org/analysis/pgn/" + get_game_moves().replaceAll(" ", "_"));
+}
+
 function get_pgn() {
-    let start = '[Event "?"]\n[Site "?"]\n[Date "????.??.??"]\n[Round "?"]\n[White "?"]\n[Black "?"]\n[Result "*"]\n\n';
-    copy_to_clipboard(start + get_game_moves() + "*");
+    let res = '[Event "?"]\n[Site "?"]\n[Date "????.??.??"]\n[Round "?"]\n[White "?"]\n[Black "?"]\n[Result "*"]\n\n' + get_game_moves() + "*";
+    copy_to_clipboard(res);
+    return res;
 }
 
 function get_fen() {

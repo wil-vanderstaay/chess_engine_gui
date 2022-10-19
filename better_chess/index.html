@@ -23,21 +23,21 @@
             <div id="chess-board"></div>
             
             <div style="outline: 2px solid black; padding: 2px; margin-left: 20px; width: 60px; height: 94vh;">
-                <button onclick="undo_move()" style="height: 50px; width: 60px;"><img draggable="false" style="width: 36px; height: 36px;" src="../chess_piece_images/undo.png"></button>
-                <button onclick="start_game(true)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px;" src="../chess_piece_images/0.png"></button>
-                <button onclick="start_game(false)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px;" src="../chess_piece_images/6.png"></button>
+                <button onclick="undo_move()" style="height: 45px; width: 60px;"><img draggable="false" style="width: 36px; height: 36px;" src="../chess_piece_images/undo.png"></button>
+                <button onclick="start_game(true)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px; margin-top: -3px;" src="../chess_piece_images/0.png"></button>
+                <button onclick="start_game(false)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px; margin-top: -3px;" src="../chess_piece_images/6.png"></button>
                 <br></br>
                 <button id="setup" onclick="run_setup_board()" style="height: 30px; width: 60px;">Setup</button>
-                <button onclick="add_piece()" style="height: 30px; width: 60px;">+</button>
+                <button onclick="add_piece()" style="height: 30px; width: 60px;"><div style="margin-left: -20px;">+<img draggable="false" style="width: 20px; height: 20px; margin-top: -3px; position: absolute;" src="../chess_piece_images/4.png"></div></button>
                 <br></br>
-                <button onclick="get_fen()" style="height: 30px; width: 60px;">Fen</button>
-                <button onclick="get_pgn()" style="height: 30px; width: 60px;">PGN</button>
+                <button onclick="open_chess_com()" style="height: 45px; width: 60px;"><img draggable="false" style="width: 36px; height: 36px;" src="../chess_piece_images/chesscom.png"></button>
+                <button onclick="open_lichess()" style="height: 45px; width: 60px;"><img draggable="false" style="width: 40px; height: 40px;" src="../chess_piece_images/lichess.png"></button>
                 <br></br>
                 <button onclick="upload_game()" style="height: 40px; width: 60px;">Load game</button>
                 <br></br>
-                <button onclick="play_rand_endgame(false)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 46px; height: 38px;" src="../chess_piece_images/dice.png"></button>
-                <button onclick="play_rand_endgame(true)" style="height: 50px; width: 60px;"><img draggable="false" style="width: 40px; height: 34px;" src="../chess_piece_images/book.png"></button>
-                <div style="height: 205px; text-align: center; font-size: 12px;" id="loading"></div>
+                <button onclick="play_rand_endgame(false)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 46px; height: 38px;" src="../chess_piece_images/dice.png"></button>
+                <button onclick="play_rand_endgame(true)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 40px; height: 34px;" src="../chess_piece_images/book.png"></button>
+                <div style="height: 205px; text-align: center; font-size: 12px; margin-top: 2px;" id="loading"></div>
 
             </div>
         </div>
