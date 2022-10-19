@@ -1035,7 +1035,7 @@ function run_setup_board() {
         button.style.backgroundColor = "";
         TURN = 0;
         display_board();
-        doHumanMove();
+        start_game(PLAYER_WHITE, get_fen());
     } else {
         button.style.backgroundColor = "#bbe0ae";
         setup_board();
@@ -1143,8 +1143,6 @@ function copy_to_clipboard(text) {
     dummy.select();
     document.execCommand("copy");
     document.body.removeChild(dummy);
-
-    alert("Copied to clipboard");
 }
 
 function open_chess_com() {
