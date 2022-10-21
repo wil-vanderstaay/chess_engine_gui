@@ -1154,14 +1154,30 @@ function open_chess_com() {
 }
 function open_lichess() {
     if (document.getElementById("stored_fen").value == START_FEN) {
-        open("https://www.lichess.org/analysis/pgn/" + get_game_moves().replaceAll(" ", "_"));
+        import_pgn(get_pgn());
+        // open("https://www.lichess.org/analysis/pgn/" + get_game_moves().replaceAll(" ", "_"));
     } else {
         open("https://www.lichess.org/analysis/" + get_fen().replaceAll(" ", "_"));
     }
 }
 
 function get_pgn() {
-    let res = '[Event "?"]\n[Site "?"]\n[Date "????.??.??"]\n[Round "?"]\n[White "?"]\n[Black "?"]\n[Result "*"]\n\n' + get_game_moves() + "*";
+    let res = `[Event "?"]
+    [Site "?"]
+    [Date "????.??.??"]
+    [Round "?"]
+    [White "`;
+    if (PLAYER_WHITE) {
+        res += `WillyWonka"]
+        [Black "Computer`;
+    } else {
+        res += `Computer"]
+        [Black "WillyWonka`;
+    }
+    res += `"]
+    [Result "*"]
+    
+    ` + get_game_moves() + "*";
     copy_to_clipboard(res);
     return res;
 }
@@ -1726,6 +1742,34 @@ function upload_game() {
     start_game(true, fen);
 }
 
+// API
+
+const import_pgn = (pgn) => {
+    let data = new FormData();
+    data.append('pgn', pgn);
+    fetch("https://lichess.org/api/import", {
+        method: "POST",
+        body: data,
+        headers: { "Authorization": `Bearer ${lichessToken}` }
+    })
+        .then(response => response.json())
+        .then(data => open(data["url"]))
+}
+
+const daily_puzzle = () => {
+    fetch("https://lichess.org/api/puzzle/daily", {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${lichessToken}`}
+    })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data)
+            console.log(data["game"]["pgn"])
+        })
+}
+
+// MAIN
+
 function prepare_game(whiteDown, fen=START_FEN, startLookahead=6) {
     DISABLE_LOOKAHEAD = false;
     GAME = [];
@@ -1753,6 +1797,7 @@ async function start_game(whiteDown, fen=START_FEN, startLookahead=6) {
 
     if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
         GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
+        document.getElementById("stored_fen").value = START_FEN;
     }
 
     if (TURN) {
