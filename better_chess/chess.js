@@ -1515,12 +1515,12 @@ function doAiMove() {
     evaluation = Math.round((evaluation + Number.EPSILON) * 10) / 10;
     if (Math.abs(evaluation).toString().length > 3) { evaluation = Math.round(evaluation); }
 
-    if (evaluation > 0) { // player winning
-        document.getElementById("top-eval").innerText = "";
-        document.getElementById("bottom-eval").innerText = evaluation;
+    if (evaluation > 0) { // white winning
+        document.getElementById("black-eval").innerText = "";
+        document.getElementById("white-eval").innerText = evaluation;
     } else {
-        document.getElementById("top-eval").innerText = Math.abs(evaluation);
-        document.getElementById("bottom-eval").innerText = "";
+        document.getElementById("black-eval").innerText = Math.abs(evaluation);
+        document.getElementById("white-eval").innerText = "";
     }
     if (PLAYER_WHITE) { evaluation *= -1; }
     document.getElementById("eval-bar").style.height = Math.min(Math.max(56 * Math.tanh(evaluation / 5) + 50, 0), 100) + "%";
@@ -1629,7 +1629,11 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 i++;
                 val += image[i];
             }
-            val = parseInt(val) % 6;
+            val = parseInt(val);
+            if (!PLAYER_WHITE) { 
+                if (val < 6) { val += 6; }
+                else { val -= 6; }    
+            }
             let m = create_move(pos, new_pos, val, 0, get_bit(BOARD[14], new_pos) ? 1 : 0);
             TURN = val < 6 ? 0 : 1;
             if (!PLAYER_WHITE) {
@@ -1789,13 +1793,18 @@ function prepare_game(whiteDown, fen=START_FEN, startLookahead=6) {
     BOARD = make_board(fen);
     hash_key = init_hash();
 
+    document.getElementById("setup").style.backgroundColor = "";
+
     if (!PLAYER_WHITE) {
         document.getElementById("eval-container").style.backgroundColor = "black";
         document.getElementById("eval-bar").style.backgroundColor = "white";
 
-        let temp = document.getElementById("bottom-eval");
-        document.getElementById("top-eval").id = "bottom-eval";
-        temp.id = "top-eval";
+        let temp = document.getElementById("white-eval");
+        document.getElementById("black-eval").id = "white-eval";
+        temp.id = "black-eval";
+
+        document.getElementById("white-eval").style.color = "black";
+        document.getElementById("black-eval").style.color = "white";
     }
 
     display_board();
