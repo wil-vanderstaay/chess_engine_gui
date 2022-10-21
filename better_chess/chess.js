@@ -1057,8 +1057,8 @@ function add_piece() {
     let value = { "P": 0, "N": 1, "B": 2, "R": 3, "Q": 4, "K": 5 };
     if (input.length != 2 || !Object.keys(value).includes(input[1]) || !"WB".includes(input[0])) { return; }
 
-    promote_piece = (input[0] == "W" ? 0 : 6) + value[input[1]];
-    console.log(promote_piece);
+    let letter = PLAYER_WHITE ? "W" : "B"
+    promote_piece = (input[0] == letter ? 0 : 6) + value[input[1]];
     for (let i = 0; i < 64; i++) {
         if (!get_bit(BOARD[14], i)) {
             set_bit(BOARD[promote_piece], i);
@@ -1486,10 +1486,8 @@ function highlightLastMove(last_move) {
     t_location.style.background = (t_location.className == "light") ? lcode : dcode;
 }
 
-function doAiMove(differentAi=false) {
-    let res;
-    if (differentAi) { res = basicSearch(4); } 
-    else { res = search(LOOKAHEAD); }
+function doAiMove() {
+    let res = search(LOOKAHEAD);
     let evaluation = res[0]; let time = res[1]; let moves = res[2];
     let best_move = pv_table[0][0];
 
@@ -1510,18 +1508,26 @@ function doAiMove(differentAi=false) {
     } else if (evaluation > 99900) {
         if (evaluation == 99999) { setTimeout(() => {  return finish(); }, 250); }
         evaluation = "M" + ((99999 - evaluation + 1) / 2 << 0);
-    } else { evaluation /= 100; }
+    } else { 
+        evaluation /= 100; 
+    }
+
+    evaluation = Math.round((evaluation + Number.EPSILON) * 10) / 10;
+    if (Math.abs(evaluation).toString().length > 3) { evaluation = Math.round(evaluation); }
+
+    if (evaluation > 0) { // player winning
+        document.getElementById("top-eval").innerText = "";
+        document.getElementById("bottom-eval").innerText = evaluation;
+    } else {
+        document.getElementById("top-eval").innerText = Math.abs(evaluation);
+        document.getElementById("bottom-eval").innerText = "";
+    }
+    if (PLAYER_WHITE) { evaluation *= -1; }
+    document.getElementById("eval-bar").style.height = Math.min(Math.max(56 * Math.tanh(evaluation / 5) + 50, 0), 100) + "%";
+
     if (time == 0) { evaluation = "Book"; }
 
-    // Print search details
-    // document.getElementById("move_number").innerHTML = "Move number: " + (get_move_number() + PLAYER_WHITE);
-    // document.getElementById("analysed").value = (COUNT);
-    // document.getElementById("depth_input").value = (LOOKAHEAD);
-    // document.getElementById("time").value = (time) + " ms";
-    // document.getElementById("move").value = md;
-    // document.getElementById("evaluation").value = evaluation;
-
-    if (!DISABLE_LOOKAHEAD && !differentAi) {
+    if (!DISABLE_LOOKAHEAD) {
         if (!time) {
             // book move
         } else if (time < 750) { // under 0.5s, INCREASE
@@ -1623,7 +1629,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 i++;
                 val += image[i];
             }
-            val = parseInt(val);
+            val = parseInt(val) % 6;
             let m = create_move(pos, new_pos, val, 0, get_bit(BOARD[14], new_pos) ? 1 : 0);
             TURN = val < 6 ? 0 : 1;
             if (!PLAYER_WHITE) {
@@ -1782,6 +1788,15 @@ function prepare_game(whiteDown, fen=START_FEN, startLookahead=6) {
     make_table(whiteDown);
     BOARD = make_board(fen);
     hash_key = init_hash();
+
+    if (!PLAYER_WHITE) {
+        document.getElementById("eval-container").style.backgroundColor = "black";
+        document.getElementById("eval-bar").style.backgroundColor = "white";
+
+        let temp = document.getElementById("bottom-eval");
+        document.getElementById("top-eval").id = "bottom-eval";
+        temp.id = "top-eval";
+    }
 
     display_board();
     initialise_ai_constants();

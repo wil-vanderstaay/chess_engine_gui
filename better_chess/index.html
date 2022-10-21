@@ -22,9 +22,17 @@
     </head>
     <body>
         <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
-            <div id="chess-board"></div>
+
+            <div id="eval-container" style="position: relative; height: 94vh; width: 20px; outline: 2px solid black; background-color: white; font-size: small; text-align: center;">
+                <div id="eval-bar" style="height: 50%; background-color: black; color: white;">
+                    <div id="top-eval"></div>
+                </div>
+                <div id="bottom-eval" style="position: absolute; bottom: 0px; width: 100%;"></div>
+            </div>
             
-            <div style="outline: 2px solid black; padding: 2px; margin-left: 20px; width: 60px; height: 94vh;">
+            <div id="chess-board" style="margin-left: 20px; margin-right: 20px;"></div>
+            
+            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;">
                 <button onclick="undo_move()" style="height: 45px; width: 60px;"><img draggable="false" style="width: 36px; height: 36px;" src="../chess_piece_images/undo.png"></button>
                 <button onclick="start_game(true)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px; margin-top: -3px;" src="../chess_piece_images/0.png"></button>
                 <button onclick="start_game(false)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px; margin-top: -3px;" src="../chess_piece_images/6.png"></button>
