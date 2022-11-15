@@ -1476,7 +1476,7 @@ function display_board() {
             for (let j = 0; j < 12; j++) {
                 if (get_bit(BOARD[j], i)) {
                     let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
-                    let piece = '<img draggable="false" style="width: ' + (width - 10) + 'px; height: ' + (width - 10) + 'px;" src="../chess_piece_images/' + (piece_number) + '.png">';
+                    let piece = '<img draggable="false" style="width: ' + (width - 10) + 'px; height: ' + (width - 10) + 'px;" src="../imgs/chess_pieces/' + (piece_number) + '.png">';
                     piece_location.innerHTML += '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
                     pieceDrag(document.getElementById((i)), i, false);
                     break;
