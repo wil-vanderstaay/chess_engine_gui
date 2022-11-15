@@ -31,6 +31,19 @@ function get_move_capture(move) { return (move & 1048576) >> 20; }
 function get_move_double(move) { return (move & 2097152) >> 21; }
 function get_move_enpassant(move) { return (move & 4194304) >> 22; }
 function get_move_castle(move) { return (move & 8388608) >> 23; }
+function get_move_uci(move) {
+    let res = "";
+    let letters = 'abcdefgh';
+    let source = get_move_source(move);
+    let target = get_move_target(move);
+    if (!PLAYER_WHITE) {
+        source = 63 - source;
+        target = 63 - target;
+    }
+    res += letters[source % 8] + (8 - (source >> 3));
+    res += letters[target % 8] + (8 - (target >> 3));
+    return res;
+}
 function get_move_desc(move, all_moves) { // all_moves for specific desc, eg. Nbg4
     let move_source = get_move_source(move);
     let move_target = get_move_target(move);
@@ -1153,15 +1166,10 @@ function open_chess_com() {
     }
 }
 function open_lichess() {
-    if (document.getElementById("stored_fen").value == START_FEN) {
-        import_pgn(get_pgn());
-        // open("https://www.lichess.org/analysis/pgn/" + get_game_moves().replaceAll(" ", "_"));
-    } else {
-        open("https://www.lichess.org/analysis/" + get_fen().replaceAll(" ", "_"));
-    }
+    import_pgn(get_pgn(document.getElementById("stored_fen").value));
 }
 
-function get_pgn() {
+function get_pgn(from_fen="") {
     let res = `[Event "?"]
     [Site "?"]
     [Date "????.??.??"]
@@ -1176,6 +1184,12 @@ function get_pgn() {
     }
     res += `"]
     [Result "*"]
+    `
+    if (from_fen) {
+        res += `[FEN "` + from_fen + `"]`
+    }
+
+    res += `
     
     ` + get_game_moves() + "*";
     copy_to_clipboard(res);
@@ -1518,8 +1532,11 @@ function doAiMove() {
     if (evaluation > 0) { // white winning
         document.getElementById("black-eval").innerText = "";
         document.getElementById("white-eval").innerText = evaluation;
-    } else {
+    } else if (evaluation < 0) {
         document.getElementById("black-eval").innerText = Math.abs(evaluation);
+        document.getElementById("white-eval").innerText = "";
+    } else {
+        document.getElementById("black-eval").innerText = evaluation;
         document.getElementById("white-eval").innerText = "";
     }
     if (PLAYER_WHITE) { evaluation *= -1; }
@@ -1709,6 +1726,9 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 move |= 983040; // set promote 15
             }
             if (do_move(move)) {
+                if (STOCKFISH_ID) {
+                    post_human_move(get_move_uci(move));
+                }
                 GAME.push(copy_board(BOARD));
                 GAME_MOVES.push(get_move_desc(move, moves));
                 GAME_HASH.push(hash_key);
@@ -1754,6 +1774,40 @@ function upload_game() {
 
 // API
 
+const post_anything = (url) => {
+    fetch("https://lichess.org/api/" + url, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${lichessToken}`}
+    })
+        .then(response => response.json())
+        .then(data => data["nowPlaying"][0]["fen"])
+}
+
+const post_human_move = (move) => {
+    fetch("https://lichess.org/api/board/game/" + STOCKFISH_ID + "/move/" + move, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${lichessToken}` }
+    })
+}
+
+let STOCKFISH_ID;
+
+const play_stockfish = (fen=START_FEN) => {
+    let data = new FormData();
+    data.append('level', 8);
+    data.append('color', fen.includes('w') ? 'white' : 'black')
+    data.append('fen', fen)
+    fetch("https://lichess.org/api/challenge/ai", {
+        method: "POST",
+        body: data,
+        headers: { "Authorization": `Bearer ${lichessToken}` }
+    })
+        .then(response => response.json())
+        .then(data => {
+            STOCKFISH_ID = data['id'];
+        })
+}
+
 const import_pgn = (pgn) => {
     let data = new FormData();
     data.append('pgn', pgn);
@@ -1780,14 +1834,15 @@ const daily_puzzle = () => {
 
 // MAIN
 
-function prepare_game(whiteDown, fen=START_FEN, startLookahead=6) {
+function prepare_game(whiteDown, fen=START_FEN) {
     DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_HASH = [];
     GAME_MOVES = [];
 
     PLAYER_WHITE = whiteDown;
-    LOOKAHEAD = startLookahead;
+    LOOKAHEAD = 6;
+    STOCKFISH_ID = "";
 
     make_table(whiteDown);
     BOARD = make_board(fen);
@@ -1811,17 +1866,21 @@ function prepare_game(whiteDown, fen=START_FEN, startLookahead=6) {
     initialise_ai_constants();
 }
 
-async function start_game(whiteDown, fen=START_FEN, startLookahead=6) {
+async function start_game(whiteDown, fen=START_FEN, stockfish=false) {
     let stored_fen = document.getElementById("stored_fen").value;
     if (fen == START_FEN && stored_fen) { fen = stored_fen; }
     if (!fen) { fen = START_FEN; } 
     document.getElementById("stored_fen").value = fen;
 
-    prepare_game(whiteDown, fen, startLookahead);
+    prepare_game(whiteDown, fen);
 
     if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
         GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
         document.getElementById("stored_fen").value = START_FEN;
+    }
+
+    if (stockfish) {
+        play_stockfish();
     }
 
     if (TURN) {
