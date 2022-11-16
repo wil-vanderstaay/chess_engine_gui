@@ -132,7 +132,7 @@ let piece_values = [
     94, 281, 297, 512, 936, 0
 ];
 
-let m = [
+let piece_position_values = [
     //pawn
     [
         0,   0,   0,   0,   0,   0,  0,   0,
@@ -283,7 +283,6 @@ let m = [
 
 // BOOK -----------------------------------------------------------------------------------------------------------------------------------------------
 
-// Openings defined by Wil
 // Accepted list of openings
 let book_games = [
     "1. d4 d6 2. c4 g6 3. Nc3 Bg7 4. e4",
@@ -750,13 +749,12 @@ let book_games = [
 ];
 
 function book_move() {
-    if (get_move_number() > 10) { // don't book move when loaded fen
-        return 0; 
-    } else if (document.getElementById("stored_fen").value != START_FEN) {
+    if (document.getElementById("stored_fen").value != START_FEN) {
         return 0;
     }
 
     let res = [];
+    // Find book games following current game
     let game_so_far = get_game_moves();
     for (let i = 0; i < book_games.length; i++) {
         if (book_games[i].startsWith(game_so_far)) {
@@ -764,6 +762,7 @@ function book_move() {
         }
     }
     if (!res.length) { return 0; }
+    // Select random book game and extract next move
     let game = book_games[res[Math.floor(Math.random() * res.length)]];
     let move = "";
     let i = game_so_far.length;
@@ -775,7 +774,7 @@ function book_move() {
         move += game[i];
         i++;
     }
-    
+    // Convert string move to number form
     let row; let col; let new_row; let new_col;
     if (move[0] == "O") {
         row = 0;
@@ -800,6 +799,7 @@ function book_move() {
     }
 
     let values = { "P": 0, "N": 1, "B": 2, "R": 3, "Q": 4, "K": 5 };
+    let piece_val;
     if (move[0] == move[0].toUpperCase()) { // N B R Q K
         piece_val = values[move[0]];
     } else {
@@ -826,7 +826,7 @@ function book_move() {
     return 0;
 }
 
-// HASING -----------------------------------------------------------------------------------------------------------------------------------------------
+// HASHING -----------------------------------------------------------------------------------------------------------------------------------------------
 
 class HashEntry {
     constructor() {
@@ -839,7 +839,7 @@ class HashEntry {
     }
 }
 
-class HashTable {
+class HashTable { // store score of positions previously explored at certain depth and its type 
     constructor() {
         this.hashes = {};
     }   
@@ -868,7 +868,7 @@ class HashTable {
     }
 }
 
-function init_zobrist() {
+function init_zobrist() { // random number lists to xor with hash key for nearly-unique board identifiers
     let number = Math.pow(2, 32);
     
     for (let i = 0; i < 64; i++) {
@@ -927,8 +927,8 @@ function piece_val_map(piece, pos, opening) {
     if (!PLAYER_WHITE) {
         pos += 7 - (pos % 8 << 1); // flip cols
     }
-    if (opening) { return piece_values[piece] + m[piece][pos]; }
-    return piece_values[piece + 6] + m[piece + 6][pos]; 
+    if (opening) { return piece_values[piece] + piece_position_values[piece][pos]; }
+    return piece_values[piece + 6] + piece_position_values[piece + 6][pos]; 
 }
 
 function evaluate_board() { // LOWER BOUND
@@ -1071,20 +1071,18 @@ function best_eval_captures(alpha, beta, depth) {
 }
 
 function is_repetition() {
-    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 2;
+    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 3;
 }
 
 function best_eval(depth, alpha, beta) {
-    if (is_repetition()) { return 0; } 
+    pv_length[ply] = ply;
+    if (ply && is_repetition()) { return 0; } 
 
     let score = HASH_TABLE.get(depth, alpha, beta);
     if (ply && score != null) {
         LOOKUP++;
         return score;
     }
-
-    let found_pv = 0;
-    pv_length[ply] = ply;
 
     if (depth == 0) { return best_eval_captures(alpha, beta, 8); }
     if (ply >= MAX_PLY) { return evaluate_board(); }
