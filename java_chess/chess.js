@@ -35,6 +35,36 @@ function get_move_uci(move) { // source square target square, eg. e2e4
     res += letters[target % 8] + (8 - (target >> 3));
     return res;
 }
+function get_uci_move(uci) {
+    let source = uci[0].charCodeAt() - (parseInt(uci[1]) << 3) - 33;
+    let target = uci[2].charCodeAt() - (parseInt(uci[3]) << 3) - 33;
+    if (!PLAYER_WHITE) {
+        source = 63 - source;
+        target = 63 - target;
+    }
+    let piece = 0;
+    for (let i = 0; i < 12; i++) {
+        if (get_bit(BOARD[i], source)) {
+            piece = i;
+            break;
+        }
+    } 
+    let promote = 0;
+    if (uci[4]) {
+        promote = piece + "nbrq".indexOf(uci[4]) + 1;
+    }
+    let capture = (get_bit(BOARD[14], target) || (piece % 6 == 0 && source % 8 != target % 8)) ? 1 : 0;
+    return create_move(
+        source, 
+        target,
+        piece,
+        promote,
+        capture,
+        (piece % 6 == 0 && Math.abs((source >> 3) - (target >> 3)) == 2) ? 1 : 0,
+        (piece % 6 == 0 && capture && !get_bit(BOARD[14], target)) ? 1 : 0,
+        (piece % 6 == 5 && Math.abs(source % 8 - target % 8) == 2) ? 1 : 0
+    );
+}
 function get_move_desc(move, all_moves=[]) { // all_moves requires to determine specific desc, eg. Nbg4
     let move_source = get_move_source(move);
     let move_target = get_move_target(move);
@@ -362,7 +392,8 @@ function do_move(move, ignore_check=false) {
     if (get_move_promote(move)) {
         let promote_piece = get_move_promote(move);
         if (promote_piece == 15) { // reserved for player promote piece
-            let input = window.prompt("N B R Q: ").toUpperCase();
+            let input = window.prompt("N B R Q: ").toUpperCase() + " ";
+            input = input[0];
             let value = "NBRQ".indexOf(input) + 1;
             if (!value) { value = 3; }
             promote_piece = piece + value;
@@ -1335,7 +1366,7 @@ function doAiMove() {
 
     if (!time) {
         // book move
-    } else if (time < 750) { // under 0.5s, INCREASE
+    } else if (time < 750) { // under 0.75s, INCREASE
         LOOKAHEAD_COUNT = 2;
     } else if (time < 1500) {
         LOOKAHEAD_COUNT++;
@@ -1376,7 +1407,6 @@ function doHumanMove() {
 let SELECTED_PIECE = 64;
 
 function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {   
-
     let pos1 = 0; let pos2 = 0; let pos3 = 0; let pos4 = 0;
     div.style.top = (top_offset) + "px";
     div.style.left = (left_offset) + "px";
@@ -1570,6 +1600,26 @@ const post_anything = (url) => {
         .then(data => data["nowPlaying"][0]["fen"])
 }
 
+const get_tablebase = async () => {
+    let res = await fetch('https://tablebase.lichess.ovh/standard?fen=' + get_fen().replaceAll(" ", "_"), {
+        method: "GET",
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data["category"] != "unknown") {
+                return data["moves"][0];
+            }
+            return 0;
+        })
+    if (res) { 
+        let eval = 0;
+        if (res["category"] == "win" || res["category"] == "loss") {
+            eval = 1000;
+        }
+        let move = get_uci_move(res["uci"]);
+    }
+}
+
 const post_human_move = (move) => {
     fetch("https://lichess.org/api/board/game/" + STOCKFISH_ID + "/move/" + move, {
         method: "POST",
@@ -1653,7 +1703,7 @@ function prepare_game(whiteDown, fen=START_FEN) {
     initialise_ai_constants();
 }
 
-async function start_game(whiteDown, fen=START_FEN, stockfish=false) {
+function start_game(whiteDown, fen=START_FEN, stockfish=false) {
     let stored_fen = document.getElementById("stored_fen").value;
     if (fen == START_FEN && stored_fen) { fen = stored_fen; }
     if (!fen) { fen = START_FEN; } 
