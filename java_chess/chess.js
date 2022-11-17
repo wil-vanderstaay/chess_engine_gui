@@ -1207,6 +1207,9 @@ function make_board(fen) {
     for (let i = 0; i < fen.length; i++) {
         let char = fen[i];
         if (char == " ") {
+            if (fen.length - i < 10) {
+                return [];
+            }
             let castle = [0, 0, 0, 0];
             let j = 3;
             while (fen[i + j] != " ") {
@@ -1252,6 +1255,7 @@ function make_board(fen) {
             curr_col++;
         }
     }
+    return [];
 }
 
 // Piece position variables
@@ -1550,13 +1554,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 GAME_MOVES.push(get_move_desc(move, moves));
                 GAME_HASH.push(hash_key);
 
-                let message = "LOADING";
-                let res = "<div>";
-                for (let i = 0; i < message.length; i++) {
-                    res += message[i] + "<br></br>";
-                }
-                res += "</div>";
-                document.getElementById("loading").innerHTML = res;
+                document.getElementById("loading").innerHTML = "LOADING";
                 
                 setTimeout(() => {  
 
@@ -1583,10 +1581,14 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
 
 function upload_game() {
     let fen = prompt("Enter fen:");
-    if (fen && fen.length < 19) { 
-        fen = START_FEN; 
+    if (fen) {
+        let test_board = make_board(fen);
+        if (!test_board || test_board.length == 0) {
+            alert("Invalid fen");
+            return;
+        }
+        start_game(true, fen);
     }
-    start_game(true, fen);
 }
 
 // API

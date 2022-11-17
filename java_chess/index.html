@@ -29,21 +29,22 @@
             <div id="chess-board" style="margin-left: 20px; margin-right: 20px;"></div>
             
             <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;">
-                <button onclick="undo_move()" style="height: 45px; width: 60px;"><img draggable="false" style="width: 36px; height: 36px;" src="../imgs/undo.png"></button>
-                <button onclick="start_game(true)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px; margin-top: -3px;" src="../imgs/chess_pieces/0.png"></button>
-                <button onclick="start_game(false)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 42px; height: 42px; margin-top: -3px;" src="../imgs/chess_pieces/6.png"></button>
+                <button onclick="undo_move()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/undo.png"></button>
+                <button onclick="start_game(true)" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: -3px;" src="../imgs/chess_pieces/0.png"></button>
+                <button onclick="start_game(false)" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: -3px;" src="../imgs/chess_pieces/6.png"></button>
                 <br></br>
-                <button id="setup" onclick="run_setup_board()" style="height: 30px; width: 60px;">Setup</button>
-                <button onclick="add_piece()" style="height: 30px; width: 60px;"><div style="margin-left: -20px;">+<img draggable="false" style="width: 20px; height: 20px; margin-top: -3px; position: absolute;" src="../imgs/chess_pieces/4.png"></div></button>
+                <button onclick="upload_game()" style="height: 4%; width: 100%;">Import</button>
+                <button id="setup" onclick="run_setup_board()" style="height: 4%; width: 100%;">Setup</button>
+                <button onclick="add_piece()" style="height: 5%; width: 100%;"><div style="height: 100%; margin-top: 6px; margin-left: -20px;">+<img draggable="false" style="height: 20px; margin-top: -3px; position: absolute;" src="../imgs/chess_pieces/4.png"></div></button>
                 <br></br>
-                <button onclick="open_chess_com()" style="height: 45px; width: 60px;"><img draggable="false" style="width: 36px; height: 36px;" src="../imgs/chesscom.png"></button>
-                <button onclick="open_lichess()" style="height: 45px; width: 60px;"><img draggable="false" style="width: 40px; height: 40px;" src="../imgs/lichess.png"></button>
+                <u>Analysis</u>
+                <button onclick="open_chess_com()" style="height: 6.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/chesscom.png"></button>
+                <button onclick="open_lichess()" style="height: 6.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/lichess.png"></button>
                 <br></br>
-                <button onclick="upload_game()" style="height: 30px; width: 60px;">Import</button>
-                <br></br>
-                <button onclick="play_rand_endgame(false)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 46px; height: 38px;" src="../imgs/dice.png"></button>
-                <button onclick="play_rand_endgame(true)" style="height: 45px; width: 60px;"><img draggable="false" style="width: 40px; height: 34px;" src="../imgs/book.png"></button>
-                <div style="height: 205px; text-align: center; font-size: 12px; margin-top: 5px;" id="loading"></div>
+                <u>Endgame</u>
+                <button onclick="play_rand_endgame(false)" style="height: 6.5%; width: 100%;"><img draggable="false" style="margin-left: -2px; height: 100%;" src="../imgs/dice.png"></button>
+                <button onclick="play_rand_endgame(true)" style="height: 6.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/book.png"></button>
+                <div style="height: 22%; font-size: 12px; text-align: center; display: flex; justify-content: center; flex-direction: column;" id="loading"></div>
 
             </div>
         </div>

@@ -1191,15 +1191,12 @@ function search(depth) {
         }
         console.log(res);
     } 
-    if (TURN && PLAYER_WHITE) {
-        eval *= -1;
-    }
+    let end = Math.round(performance.now() - start);
     if (pv_table[0][0]) {
-        console.log("Best move: " + (get_move_desc(pv_table[0][0])) + ", eval: " + (eval));
+        console.log("Best move: " + (get_move_desc(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (end));
     }
     console.log(" ");
-
-    return [eval, Math.round(performance.now() - start), generate_pseudo_moves()];
+    return [eval, end, generate_pseudo_moves()];
 }
 
 // MAIN -----------------------------------------------------------------------------------------------------------------------------------------------
