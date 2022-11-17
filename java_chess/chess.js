@@ -395,7 +395,7 @@ function do_move(move, ignore_check=false) {
             let input = window.prompt("N B R Q: ").toUpperCase() + " ";
             input = input[0];
             let value = "NBRQ".indexOf(input) + 1;
-            if (!value) { value = 3; }
+            if (!value) { value = 4; }
             promote_piece = piece + value;
         }
         pop_bit(BOARD[piece], target);
@@ -932,8 +932,8 @@ function play_rand_endgame(book) {
         ["8/pp4pp/2pn1k2/3p1p2/3P1K2/6PP/PPP1B1P1/8 w - - 0 24", "Equal"], // B vs. N
         ["4n3/p3k3/1p4P1/2pK4/P2p4/1P6/2P1B3/8 w - - 0 49", "White"], // B vs. N
         ["8/5k2/4p2p/4P3/B1np1KP1/3b4/8/2B5 b - - 0 1", "Equal"], // B+N vs. 2B         #25
-        ["8/1p4p1/5p1p/1k3P2/6PP/3KP3/8/8 w - - 0 50", "White"] // K+P
-        ["8/8/1p1k4/5ppp/PPK1p3/6P1/5PP1/8 b - - 0 0", "Black"] // K+P
+        ["8/1p4p1/5p1p/1k3P2/6PP/3KP3/8/8 w - - 0 50", "White"], // K+P
+        ["8/8/1p1k4/5ppp/PPK1p3/6P1/5PP1/8 b - - 0 0", "Black"], // K+P
     ]
     let index = Math.floor(Math.random() * endgames.length);
     let fen = endgames[index][0];
@@ -947,7 +947,7 @@ function play_rand_endgame(book) {
         i++;
     }
     document.getElementById("stored_fen").value = "";
-    start_game(PLAYER_WHITE, fen);
+    start_game(PLAYER_WHITE, fen, 8);
 }
 
 function undo_move() {
@@ -1363,12 +1363,17 @@ function doAiMove() {
         }
     }
     if (PLAYER_WHITE) { evaluation *= -1; }
+    else {
+        // let temp = document.getElementById("black-eval").innerText
+        // document.getElementById("black-eval").innerText = document.getElementById("white-eval").innerText;
+        // document.getElementById("white-eval").innerText = temp;
+    }
     document.getElementById("eval-bar").style.height = Math.min(Math.max(56 * Math.tanh(evaluation / 5) + 50, 0), 100) + "%";
 
     if (time == 0) { evaluation = "Book"; }
     if (is_repetition()) { setTimeout(() => {  return finish(); }, 250); }
 
-    if (!time) {
+    if (time == 0) {
         // book move
     } else if (time < 750) { // under 0.75s, INCREASE
         LOOKAHEAD_COUNT = 2;
@@ -1673,14 +1678,14 @@ const daily_puzzle = () => {
 
 // MAIN
 
-function prepare_game(whiteDown, fen=START_FEN) {
+function prepare_game(whiteDown, fen, lookahead) {
     DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_HASH = [];
     GAME_MOVES = [];
 
     PLAYER_WHITE = whiteDown;
-    LOOKAHEAD = 6;
+    LOOKAHEAD = lookahead;
     STOCKFISH_ID = "";
 
     make_table(whiteDown);
@@ -1689,10 +1694,19 @@ function prepare_game(whiteDown, fen=START_FEN) {
 
     document.getElementById("setup").style.backgroundColor = "";
 
-    if (!PLAYER_WHITE) {
+    // Setup eval bar
+    if (PLAYER_WHITE && document.getElementById("black-eval").style.position) {
+        document.getElementById("eval-container").style.backgroundColor = "white";
+        document.getElementById("eval-bar").style.backgroundColor = "black";
+        let temp = document.getElementById("white-eval");
+        document.getElementById("black-eval").id = "white-eval";
+        temp.id = "black-eval";
+
+        document.getElementById("white-eval").style.color = "black";
+        document.getElementById("black-eval").style.color = "white";
+    } else if (!PLAYER_WHITE && document.getElementById("white-eval").style.position) {
         document.getElementById("eval-container").style.backgroundColor = "black";
         document.getElementById("eval-bar").style.backgroundColor = "white";
-
         let temp = document.getElementById("white-eval");
         document.getElementById("black-eval").id = "white-eval";
         temp.id = "black-eval";
@@ -1705,13 +1719,13 @@ function prepare_game(whiteDown, fen=START_FEN) {
     initialise_ai_constants();
 }
 
-function start_game(whiteDown, fen=START_FEN, stockfish=false) {
+function start_game(whiteDown, fen=START_FEN, lookahead=6, stockfish=false) {
     let stored_fen = document.getElementById("stored_fen").value;
     if (fen == START_FEN && stored_fen) { fen = stored_fen; }
     if (!fen) { fen = START_FEN; } 
     document.getElementById("stored_fen").value = fen;
 
-    prepare_game(whiteDown, fen);
+    prepare_game(whiteDown, fen, lookahead);
 
     if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
         GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];

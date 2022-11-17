@@ -512,13 +512,10 @@ let book_games = [
     "1. e4 c5 2. d4 cxd4 3. c3",
     "1. e4 c5 2. c3 e6",
     "1. e4 c5 2. c3 d6",
-    "1. e4 c5 2. c3 g6",
     "1. e4 c5 2. c3 e5",
-    "1. e4 c5 2. c3 b6",
     "1. e4 c5 2. c3 Nc6",
-    "1. e4 c5 2. c3 Qa5",
-    "1. e4 c5 2. c3 Nf6",
     "1. e4 c5 2. c3 d5",
+    "1. e4 c5 2. c3 Nf6",
     "1. e4 c5 2. Nc3 e6",
     "1. e4 c5 2. Nc3 d6",
     "1. e4 c5 2. Nc3 Nc6 3. f4",
@@ -679,14 +676,8 @@ let book_games = [
     "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 e6",
     "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 c6",
     "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Nc6",
-    // Ruy lopez
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Nxe5 Nxe5",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Nxe5 Be7",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 Be7 7. Nxe5 Nxe5",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 Be7 7. Nc3 O-O",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 Be7 7. d4 exd4",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 f6",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. Re1 Nd6 6. Ba4 b5",
+
+    // Ruy lopez berlin
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Bxc6 dxc6",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. dxe5 Nxb5",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Ba4 exd4",
@@ -698,15 +689,28 @@ let book_games = [
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 O-O",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 Bb6",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 Nxe4",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nc3 O-O",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nc3 Nd4",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nc3 d6",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. c3 O-O",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. Nbd2 O-O",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. Bxc6 dxc6",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 d6",
     "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bd6",
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3 Bb4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3 Nd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3 Bc5",
+
+    // Ruy lopez morphy
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. d3 b5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. h3 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. a4 b4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. a4 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O b5 6. Bb3 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O b5 6. Bb3 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O b5 6. Bb3 Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. dxe5 Be6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. Nxe5 Nxe5",
+
     // Italian
     "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. O-O",
     "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. Nbd2",
@@ -743,6 +747,17 @@ let book_games = [
     "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. d4 Nf6",
     "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. d4 Nxd4",
     "1. e4 e5 2. Nf3 Nc6 3. Bc4 d6 4. h3 Be7",
+    
+    // Alapin sicilian
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. Nf3",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. Nf3 Nc6",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. Nf3 e6",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. cxd4 d6",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. cxd4 e6",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 e6",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 Bg4",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nc6",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 e6",
     // Scotch games
     // French
     // Caro cann
@@ -1191,6 +1206,9 @@ function search(depth) {
         }
         console.log(res);
     } 
+    if (TURN && PLAYER_WHITE) {
+        eval *= -1;
+    }
     let end = Math.round(performance.now() - start);
     if (pv_table[0][0]) {
         console.log("Best move: " + (get_move_desc(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (end));
