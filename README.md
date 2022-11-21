@@ -16,7 +16,7 @@ A conversion of the java_chess engine to c++ to compare the performance gains in
 
 ### Robotic Chess Board
 
-I am creating a physical chess board to allow my ./c_chess AI to be battled on a real board. The pieces will be moved by a magnet underneath the board, operated by 2 stepper motors. Path plotting code is required so pieces being moved don't collide with other pieces on the board and can be found in the ./c_chess directory.
+I am creating a physical chess board to allow my ./c_chess AI to be battled on a real board. The pieces will be moved by a magnet underneath the board, operated by 2 stepper motors. Path plotting code is required so pieces being moved don't collide with other pieces on the board and can be found in the ./c_chess directory. The code will be uploaded to an Arduino microcontroller and connected to the physical components to operate the board.
 
 I have developed chess pieces using a 3D printer which will eventually contain a RFID chip to identify the piece and a marget to move it around. The next step of this project is to create the physical board containing readers on each of the 64 squares so the engine can be loaded from any position.   
 
