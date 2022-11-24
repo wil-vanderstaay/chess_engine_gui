@@ -39,9 +39,9 @@ function perft(depth, print=1) {
     return res;
 }
 
-function time_perft() {
+function time_perft(depth) {
     let s = performance.now();
-    perft(5, 0);
+    perft(depth, 1);
     console.log("PERFT TIME", performance.now() - s);
 }
 

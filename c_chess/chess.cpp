@@ -1201,7 +1201,12 @@ int main(int argc, char *argv[]) {
 
     initialise();
 
-    play_game(start_position, 50, 6);
+    // play_game(start_position, 50, 6);
+
+    create_board(start_position);
+    print_board();
+
+    search(9);
 
     return 0;
 }

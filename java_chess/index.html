@@ -5,12 +5,10 @@
         <meta charset="UTF-8">
         <style>            
             .chess-board { border-spacing: 0; user-select: none; }
-            .chess-board th { padding: .25em; }
-            .chess-board table, td { border: 1px solid #000; }
-            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh); } /* Calc ensures correct dimensions when resizing */
+            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
 
-            .chess-board .light { background: #f0d9b5; color: #946f51; font-size: 14px; font-weight: bold; }
-            .chess-board .dark { background: #946f51; color: #f0d9b5; font-size: 14px; font-weight: bold; }
+            .light { background: #f1d9c0; color: #a97a65; }
+            .dark { background: #a97a65; color: #f1d9c0; }
 
             .chess-piece { position: absolute; z-index: 1000; }
             .move-circle { padding-left: 20px; }

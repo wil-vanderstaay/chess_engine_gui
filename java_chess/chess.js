@@ -138,8 +138,13 @@ function get_move_desc(move, all_moves=[]) { // all_moves requires to determine 
     0100    ai king
     1000    ai queen
 */
-function create_castle(array=[1,1,1,1]) {
-    return (array[0]) | (array[1] << 1) | (array[2] << 2) | (array[3] << 3);
+function create_castle(castle_str) {
+    let res = 0;
+    let lookup = (PLAYER_WHITE) ? "KQkq" : "kqKQ";
+    for (let i = 0; i < castle_str.length; i++) {
+        res |= 1 << lookup.indexOf(castle_str[i]);
+    }
+    return res;
 }
 let CASTLING_RIGHTS = [
     7, 15, 15, 15,  3, 15, 15, 11,
@@ -1124,6 +1129,14 @@ function flip_fen(fen) {
     return res;
 }
 
+function square_to_pos(square) {
+    let res = square[0].charCodeAt() - (parseInt(square[1]) << 3) - 33;
+    if (!PLAYER_WHITE) {
+        res = 63 - res;
+    }
+    return res;
+}
+
 function make_table(player_white) {
     let table = '<table id="chess-table" class="chess-board">';
     let row_order = player_white ? "87654321" : "12345678";
@@ -1131,12 +1144,8 @@ function make_table(player_white) {
     for (let row = 0; row < 8; row++) {
         table += '<tr>';
         for (let col = 0; col < 8; col++) {
-            if ((row + col) % 2 == 1) {
-                colour_class = 'dark';    
-            } else {
-                colour_class = 'light';
-            }
-            table += '<td id="s' + (8 * row + col) + '" class="' + colour_class + '" style="position: relative;">';
+            let colour_class = ((row + col) % 2) ? 'dark' : 'light';
+            table += '<td id="s' + ((row << 3) + col) + '" class="' + colour_class + '">';
             if (col == 0) {
                 table += '<div style="position: absolute; top: -1px; left: 0px;">' + row_order[row] + '</div>';
             }
@@ -1151,111 +1160,33 @@ function make_table(player_white) {
 }
 
 function make_board(fen) {
-    function asList(array) {
-        let res = [];
-        for (let i = 0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-                res.push(array[i][j]);
-            }
-        }
-        return res;
-    }
-    let values;
-    if (PLAYER_WHITE) {
-        values = {
-            P: 1,
-            N: 2,
-            B: 3,
-            R: 4,
-            Q: 5,
-            K: 6,
-    
-            p: 7,
-            n: 8,
-            b: 9,
-            r: 10,
-            q: 11,
-            k: 12,                   
-        }
-    } else {
-        values = {
-            P: 7,
-            N: 8,
-            B: 9,
-            R: 10,
-            Q: 11,
-            K: 12,
-    
-            p: 1,
-            n: 2,
-            b: 3,
-            r: 4,
-            q: 5,
-            k: 6,                   
-        }
-        fen = flip_fen(fen);
-    }
+    let res = new Array(64).fill(0);
+    let split_fen = fen.split(" ");
 
-    let res = new Array(8);
-    for (let i = 0; i < 8; i++) {
-        res[i] = new Array(8).fill(0);
-    }
-
-    let curr_row = 0;
-    let curr_col = 0;
-
-    for (let i = 0; i < fen.length; i++) {
+    let pieces = "PNBRQKpnbrqk";
+    let row = 0;
+    let col = 0;
+    for (let i = 0; i < split_fen[0].length; i++) {
         let char = fen[i];
-        if (char == " ") {
-            if (fen.length - i < 10) {
-                return [];
-            }
-            let castle = [0, 0, 0, 0];
-            let j = 3;
-            while (fen[i + j] != " ") {
-                if (fen[i + j] == "K") {
-                    castle[0] = 1;
-                } else if (fen[i + j] == "Q") {
-                    castle[1] = 1;
-                } else if (fen[i + j] == "k") {
-                    castle[2] = 1;
-                } else if (fen[i + j] == "q") {
-                    castle[3] = 1;
-                }
-                j++;
-            }
-            if (fen[i + j + 1] != "-") {
-                EN_PASSANT_SQUARE = 8 * (8 - parseInt(fen[i + j + 2])) + fen[i + j + 1].charCodeAt() - 97;
-                if (!PLAYER_WHITE) {
-                    EN_PASSANT_SQUARE = 63 - EN_PASSANT_SQUARE;
-                }
-            }
-
-            TURN = fen[i + 1] == "w" ? 0 : 1;
-
-            if (!PLAYER_WHITE) {
-                TURN ^= 1;
-                let temp = castle[0];
-                castle[0] = castle[2];
-                castle[2] = temp;
-                temp = castle[1];
-                castle[1] = castle[3];
-                castle[3] = temp;
-            }
-            CASTLE = create_castle(castle);
-            return create_board(asList(res));
-
-        } else if (char == "/") {
-            curr_row++;
-            curr_col = 0;
+        if (char == "/") {
+            row++;
+            col = 0;
         } else if (!isNaN(char)) {
-            curr_col += parseInt(char);
+            col += parseInt(char);
         } else {
-            res[curr_row][curr_col] = values[char];
-            curr_col++;
+            res[(row << 3) + col] = pieces.indexOf(char) + 1;
+            col++;
         }
     }
-    return [];
+
+    TURN = split_fen[1] == "w" ? 0 : 1;
+    if (split_fen[2] != "-") {
+        CASTLE = create_castle(split_fen[2]);
+    }
+    if (split_fen[3] != "-") { 
+        EN_PASSANT_SQUARE = square_to_pos(split_fen[3]);
+    }
+    return create_board(res);
 }
 
 // Piece position variables
@@ -1679,7 +1610,6 @@ const daily_puzzle = () => {
 // MAIN
 
 function prepare_game(whiteDown, fen, lookahead) {
-    DISABLE_LOOKAHEAD = false;
     GAME = [];
     GAME_HASH = [];
     GAME_MOVES = [];
@@ -1750,7 +1680,7 @@ let KING_ATTACK;
 
 let PLAYER_WHITE;
 let TURN; // 0 for player, 1 for ai
-let CASTLE = create_castle();
+let CASTLE;
 let EN_PASSANT_SQUARE; // pawn moves 2 spots, record position behind pawn
 
 let LOOKAHEAD_COUNT = 0;
@@ -1767,4 +1697,5 @@ let GAME_MOVES;
 initialiseConstants();
 initialise_ai_constants();
 
+let tricky_fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
 start_game(true);
