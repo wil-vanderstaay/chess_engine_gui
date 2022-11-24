@@ -468,6 +468,93 @@ function do_move(move, ignore_check=false) {
     return true;
 }
 
+// HASHING ----------------------------------------------------------------------------------------------------------------------
+// HASHING -----------------------------------------------------------------------------------------------------------------------------------------------
+
+class HashEntry {
+    constructor() {
+        this.first = 0;
+        this.last = 0;
+        this.depth = 0;
+
+        this.flag = 0;
+        this.score = 0;
+    }
+}
+
+class HashTable { // store score of positions previously explored at certain depth and its type 
+    constructor() {
+        this.hashes = {};
+    }   
+
+    get(depth, alpha, beta) {
+        let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
+        let entry = this.hashes[key];
+        if (entry != null && entry.first == hash_key[0] && entry.last == hash_key[1] && entry.depth >= depth) {
+            if (entry.flag == 1) { return entry.score; } // exact
+            if (entry.flag == 2 && entry.score <= alpha) { return alpha; } // alpha
+            if (entry.flag == 3 && entry.score >= beta) { return beta; } // beta
+        }
+        return null
+    }
+
+    set(depth, flag, score) {
+        let entry = new HashEntry();
+        entry.first = hash_key[0];
+        entry.last = hash_key[1];
+        entry.depth = depth;
+        entry.flag = flag;
+        entry.score = score;
+
+        let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
+        this.hashes[key] = entry;
+    }
+}
+
+function init_zobrist() { // random number lists to xor with hash key for nearly-unique board identifiers
+    let number = Math.pow(2, 32);
+    ZOB_TABLE = [];
+    for (let i = 0; i < 64; i++) {
+        let square = [];
+        for (let j = 0; j < 12; j++) {
+            square.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]);
+        }
+        ZOB_TABLE.push(square);
+    }
+    ZOB_TABLE.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]); // ZOB_TABLE[64] = turn
+    
+    let castles = [];
+    for (let k = 0; k < 16; k++) {
+        castles.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]); // ZOB_TABLE[65][c] = castle
+    }
+    ZOB_TABLE.push(castles);
+
+    let enpass = [];
+    for (let l = 0; l < 64; l++) {
+        enpass.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]); // ZOB_TABLE[66][e] = en passant
+    }
+    ZOB_TABLE.push(enpass);
+}
+
+function init_hash() {
+    let res = [0, 0];
+    for (let i = 0; i < 12; i++) {
+        let b = copy_bitboard(BOARD[i]);
+        while (bool_bitboard(b)) {
+            let square = pop_lsb_index(b);
+            res = xor_bitboards(res, ZOB_TABLE[square][i]);
+        }
+    }
+    if (TURN) { res = xor_bitboards(res, ZOB_TABLE[64]); }
+    res = xor_bitboards(res, ZOB_TABLE[65][CASTLE]) // castle
+    if (EN_PASSANT_SQUARE) { res = xor_bitboards(res, ZOB_TABLE[66][EN_PASSANT_SQUARE]); }
+    return res;
+}
+
+function is_repetition() {
+    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 3;
+}
+
 // DEFINE MOVES ----------------------------------------------------------------------------------------------------------------------
 
 function initialise_constants() { // attack masks for pawns knights kings from any square 
@@ -476,6 +563,7 @@ function initialise_constants() { // attack masks for pawns knights kings from a
     KING_ATTACK = king_attack(); // [square]
 
     init_zobrist();
+    reset_search_tables();
 
     ROW_MASKS = new Array(64); 
     COL_MASKS = new Array(64);
@@ -821,6 +909,48 @@ function finish() {
         }
     }
     setTimeout(() => { alert(message); }, 250);
+}
+
+function opponent_att_mask() {
+    let res = [0, 0];
+    // Pawn moves
+    let piece = PLAYER_WHITE ? 6 : 0;
+    let piece_board = copy_bitboard(BOARD[piece]);
+    while (bool_bitboard(piece_board)) {
+        res = or_bitboards(res, PAWN_ATTACK[PLAYER_WHITE ? 1 : 0][pop_lsb_index(piece_board)]);
+    }
+    // Knight moves
+    piece++;
+    piece_board = copy_bitboard(BOARD[piece]);
+    while(bool_bitboard(piece_board)) {
+        res = or_bitboards(res, KNIGHT_ATTACK[pop_lsb_index(piece_board)]);
+    }
+    // Bishop moves
+    piece++;
+    piece_board = copy_bitboard(BOARD[piece]);
+    while(bool_bitboard(piece_board)) {
+        res = or_bitboards(res, bishop_attack_fly(pop_lsb_index(piece_board), BOARD[14]));
+    }
+    // Rook moves
+    piece++;
+    piece_board = copy_bitboard(BOARD[piece]);
+    while(bool_bitboard(piece_board)) {
+        res = or_bitboards(res, rook_attack_fly(pop_lsb_index(piece_board), BOARD[14]));
+    }
+    // Queen moves
+    piece++;
+    piece_board = copy_bitboard(BOARD[piece]);
+    while(bool_bitboard(piece_board)) {
+        res = or_bitboards(res, queen_attack_fly(pop_lsb_index(piece_board), BOARD[14]));
+    }
+    // King moves
+    piece++;
+    piece_board = copy_bitboard(BOARD[piece]);
+    return or_bitboards(res, KING_ATTACK[pop_lsb_index(piece_board)]);
+}
+
+function is_repetition() {
+    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 3;
 }
 
 // HTML ----------------------------------------------------------------------------------------------------------------------
@@ -1301,7 +1431,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
             if (do_move(move)) {
                 GAME.push(copy_board(BOARD));
                 GAME_MOVES.push(get_move_san(move, moves));
-                GAME_HASH.push(hash_key);
+                GAME_HASH.push(copy_bitboard(hash_key));
 
                 document.getElementById("loading").innerHTML = "LOADING";
                 
@@ -1338,7 +1468,7 @@ function doAiMove() {
 
     GAME.push(copy_board(BOARD));
     GAME_MOVES.push(get_move_san(best_move, moves));
-    GAME_HASH.push(hash_key);
+    GAME_HASH.push(copy_bitboard(hash_key));
 
     evaluation = Math.round(evaluation + Number.EPSILON);
     if (Math.abs(evaluation) > 99900) {
@@ -1409,7 +1539,7 @@ function upload_game() {
     }
 }
 
-// API
+// API ----------------------------------------------------------------------------------------------------------------------
 
 const post_anything = (url) => {
     fetch("https://lichess.org/api/" + url, {
@@ -1489,7 +1619,7 @@ const daily_puzzle = () => {
         })
 }
 
-// MAIN
+// MAIN ----------------------------------------------------------------------------------------------------------------------
 
 function prepare_game(whiteDown, fen, lookahead) {
     GAME = [];
@@ -1502,9 +1632,6 @@ function prepare_game(whiteDown, fen, lookahead) {
 
     make_table();
     BOARD = make_board(fen);
-    console.log(CASTLE);
-    console.log(EN_PASSANT_SQUARE);
-    console.log(TURN);
     hash_key = init_hash();
     HASH_TABLE = new HashTable();
 
@@ -1569,9 +1696,6 @@ let EN_PASSANT_SQUARE; // pawn moves 2 spots, record position behind pawn
 let LOOKAHEAD_COUNT = 0;
 let LOOKAHEAD;
 
-let opening_phase = 6192;
-let endgame_phase = 518;
-
 let BOARD;
 let GAME; // for easy undo move
 let GAME_HASH;
@@ -1581,3 +1705,17 @@ initialise_constants();
 
 let tricky_fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
 start_game(true);
+
+/*
+    AI (WHITE) vs AI2 (BLACK)  ->  AI2 has no endgame evaluation
+    BLACK WINS!
+    1. e4 Nc6 2. d4 { B00 Nimzowitsch Defense } e6 3. Bb5 a6 4. Bxc6 bxc6 5. Nf3 Nf6 6. Nbd2 d5 7. e5 Nd7 8. O-O Be7 9. Nb3 Nb6 10. Na5 Bd7 11. Qd3 O-O 12. Be3 Rb8 13. Rac1 Bb4 14. Nb3 Nc4 15. Ng5 g6 16. a3 Be7 17. f4 Nxb2 18. Qxa6 Nc4 19. Rce1 Ra8 20. Qb7 Nxa3 21. Rc1 h6 22. Nf3 Nxc2 23. Rxc2 Rb8 24. Qa6 Rxb3 25. Re1 Re8 26. Nd2 Ra3 27. Qb7 Bh4 28. g3 Be7 29. Nb3 Kh8 30. Nc5 Bxc5 31. Rxc5 Ra2 32. Qb3 Qa8 33. h4 Rb8 34. Qd3 Rbb2 35. f5 Rg2+ 36. Kh1 Rh2+ 37. Kg1 Rag2+ 38. Kf1 Qa2 39. Re2 Rxe2 40. Rc2 Qb1+ 41. Bc1 Rxc2 42. Qxc2 Rxc2 43. fxg6 Qxc1# { Black wins by checkmate. } 0-1
+
+    AI (WHITE) vs AI2 (BLACK)  ->  AI2 only addded delta pruning, increased capture search
+    WHITE WINS!
+    1. e4 Nc6 2. d4 { B00 Nimzowitsch Defense } e6 3. Bb5 a6 4. Bxc6 bxc6 5. Nf3 Nf6 6. Nbd2 d5 7. e5 Nd7 8. O-O Be7 9. Nb3 Nb6 10. Na5 Bd7 11. Qd3 O-O 12. Be3 c5 13. dxc5 Bb5 14. Qc3 Na4 15. Qa3 Bxf1 16. Rxf1 Qe8 17. b4 f6 18. Nd4 fxe5 19. Nxe6 d4 20. Nxc7 Qd7 21. Nxa8 dxe3 22. Qxe3 Rxa8 23. Qb3+ Kh8 24. c6 Qg4 25. Qxa4 Qxb4 26. Qxb4 Bxb4 27. Nc4 Rc8 28. Rb1 a5 29. a3 Bf8 30. Nxa5 Bc5 31. Rb5 Bxa3 32. Nc4 Bf8 33. Nxe5 Kg8 34. Rd5 Ra8 35. g4 Rc8 36. Rd7 Bc5 37. g5 Bb6 38. Kg2 Rf8 39. Nd3 Rc8 40. Ne5 Rf8 41. Nd3 Rc8 42. Nb4 Kf8 43. Rd5 Re8 44. Rb5 Bc7 45. Na6 Rc8 46. Rb7 Ba5 47. Rb5 Bd2 48. c7 Ke7 49. Kf3 h6 50. g6 Bc3 51. Ke4 Kd6 52. Rb8 Kd7 53. Kd5 Rxc7 54. Nxc7 Kxc7 55. Rf8 Kb6 56. h4 Kb5 57. Rb8+ Ka6 58. h5 Ka5 59. f4 Ka6 60. Rc8 Bb2 61. c4 Kb7 62. Rf8 Bc3 63. f5 Ka7 64. f6 Bxf6 65. Rxf6 gxf6 66. g7 f5 67. g8=Q Kb7 68. Kc5 f4 69. Qf7+ Ka8 70. Qg8+ Kb7 71. Qf7+ Ka8 72. Qg8+ Kb7 *
+
+    AI (BLACK) vs AI2 (WHITE)  -> same as above
+    BLACK WINS!
+    1. Nf3 d5 2. d4 Nf6 { D02 Queen's Pawn Game: Symmetrical Variation } 3. Nc3 Nc6 4. Bf4 e6 5. e3 Bb4 6. Bd3 Ne4 7. Bxe4 dxe4 8. Nd2 f5 9. Rf1 O-O 10. Nc4 b6 11. a3 Bxc3+ 12. bxc3 Ba6 13. Ne5 Nxe5 14. Bxe5 Bxf1 15. Kxf1 c5 16. dxc5 Qxd1+ 17. Rxd1 bxc5 18. Rd6 Rad8 19. Rxe6 Rd1+ 20. Ke2 Rfd8 21. Bd4 Rc1 22. Bxc5 Rxc2+ 23. Ke1 Rb8 24. Rd6 Rb1+ 25. Rd1 Rxd1+ 26. Kxd1 Rxf2 27. g3 *
+*/

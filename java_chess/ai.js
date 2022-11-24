@@ -738,88 +738,6 @@ function book_move() {
     return create_move_san(move);
 }
 
-// HASHING -----------------------------------------------------------------------------------------------------------------------------------------------
-
-class HashEntry {
-    constructor() {
-        this.first = 0;
-        this.last = 0;
-        this.depth = 0;
-
-        this.flag = 0;
-        this.score = 0;
-    }
-}
-
-class HashTable { // store score of positions previously explored at certain depth and its type 
-    constructor() {
-        this.hashes = {};
-    }   
-
-    get(depth, alpha, beta) {
-        let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
-        let entry = this.hashes[key];
-        if (entry != null && entry.first == hash_key[0] && entry.last == hash_key[1] && entry.depth >= depth) {
-            if (entry.flag == 1) { return entry.score; } // exact
-            if (entry.flag == 2 && entry.score <= alpha) { return alpha; } // alpha
-            if (entry.flag == 3 && entry.score >= beta) { return beta; } // beta
-        }
-        return null
-    }
-
-    set(depth, flag, score) {
-        let entry = new HashEntry();
-        entry.first = hash_key[0];
-        entry.last = hash_key[1];
-        entry.depth = depth;
-        entry.flag = flag;
-        entry.score = score;
-
-        let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
-        this.hashes[key] = entry;
-    }
-}
-
-function init_zobrist() { // random number lists to xor with hash key for nearly-unique board identifiers
-    let number = Math.pow(2, 32);
-    ZOB_TABLE = [];
-    for (let i = 0; i < 64; i++) {
-        let square = [];
-        for (let j = 0; j < 12; j++) {
-            square.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]);
-        }
-        ZOB_TABLE.push(square);
-    }
-    ZOB_TABLE.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]); // ZOB_TABLE[64] = turn
-    
-    let castles = [];
-    for (let k = 0; k < 16; k++) {
-        castles.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]); // ZOB_TABLE[65][c] = castle
-    }
-    ZOB_TABLE.push(castles);
-
-    let enpass = [];
-    for (let l = 0; l < 64; l++) {
-        enpass.push([Math.floor(Math.random() * number), Math.floor(Math.random() * number)]); // ZOB_TABLE[66][e] = en passant
-    }
-    ZOB_TABLE.push(enpass);
-}
-
-function init_hash() {
-    let res = [0, 0];
-    for (let i = 0; i < 12; i++) {
-        let b = copy_bitboard(BOARD[i]);
-        while (bool_bitboard(b)) {
-            let square = pop_lsb_index(b);
-            res = xor_bitboards(res, ZOB_TABLE[square][i]);
-        }
-    }
-    if (TURN) { res = xor_bitboards(res, ZOB_TABLE[64]); }
-    res = xor_bitboards(res, ZOB_TABLE[65][CASTLE]) // castle
-    if (EN_PASSANT_SQUARE) { res = xor_bitboards(res, ZOB_TABLE[66][EN_PASSANT_SQUARE]); }
-    return res;
-}
-
 // EVALUATE -----------------------------------------------------------------------------------------------------------------------------------------------
 
 function get_gamephase_score() {
@@ -982,10 +900,6 @@ function best_eval_captures(alpha, beta, depth) {
     return alpha;
 }
 
-function is_repetition() {
-    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 3;
-}
-
 function best_eval(depth, alpha, beta) {
     pv_length[ply] = ply;
     if (ply && is_repetition()) { return 0; } 
@@ -1116,6 +1030,9 @@ function search(depth) {
 }
 
 // MAIN -----------------------------------------------------------------------------------------------------------------------------------------------
+
+let opening_phase = 6192;
+let endgame_phase = 518;
 
 let ply = 0;
 let MAX_PLY = 64;
