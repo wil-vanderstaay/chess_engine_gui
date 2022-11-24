@@ -47,12 +47,6 @@ function time_perft(depth) {
 
 // CONSTANTS -----------------------------------------------------------------------------------------------------------------------------------------------
 
-function initialise_ai_constants() {
-    initialise_masks();
-    init_zobrist();
-    HASH_TABLE = new HashTable();
-}
-
 function reset_search_tables() {
     // Killer moves - moves that cause snip in earlier iteration, check sooner
     killer_moves = [new Array(MAX_PLY), new Array(MAX_PLY)]; // id, ply
@@ -64,64 +58,6 @@ function reset_search_tables() {
     pv_length = new Array(MAX_PLY); // ply
     pv_table = new Array(MAX_PLY); // ply, ply
     for (let i = 0; i < MAX_PLY; i++) { pv_table[i] = new Array(MAX_PLY); }
-}
-
-function set_row_col_mask(row, col) {
-    let res = [0, 0];
-    if (row > 0) {
-        for (let i = 0; i < 8; i++) {
-            set_bit(res, 8 * row + i);
-        }
-    } 
-    if (col > 0) {
-        for (let i = 0; i < 8; i++) {
-            set_bit(res, col + 8 * i);
-        }
-    } 
-    return res;
-}
-
-function initialise_masks() {
-    row_masks = new Array(64); col_masks = new Array(64);
-    isolated_masks = new Array(64); 
-    player_passed_masks = new Array(64); ai_passed_masks = new Array(64);
-    for (let s = 0; s < 64; s++) {
-        row_masks[s] = [0, 0];
-        col_masks[s] = [0, 0];
-        isolated_masks[s] = [0, 0];
-        player_passed_masks[s] = [0, 0];
-        ai_passed_masks[s] = [0, 0];
-    }
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-            let square = 8 * i + j;
-
-            row_masks[square] = or_bitboards(row_masks[square], set_row_col_mask(i, -1));
-            col_masks[square] = or_bitboards(col_masks[square], set_row_col_mask(-1, j));
-
-            isolated_masks[square] = or_bitboards(isolated_masks[square], set_row_col_mask(-1, j - 1));
-            isolated_masks[square] = or_bitboards(isolated_masks[square], set_row_col_mask(-1, j + 1));
-
-            player_passed_masks[square] = or_bitboards(player_passed_masks[square], set_row_col_mask(-1, j - 1));
-            player_passed_masks[square] = or_bitboards(player_passed_masks[square], set_row_col_mask(-1, j));
-            player_passed_masks[square] = or_bitboards(player_passed_masks[square], set_row_col_mask(-1, j + 1));
-
-            ai_passed_masks[square] = or_bitboards(ai_passed_masks[square], set_row_col_mask(-1, j - 1));
-            ai_passed_masks[square] = or_bitboards(ai_passed_masks[square], set_row_col_mask(-1, j));
-            ai_passed_masks[square] = or_bitboards(ai_passed_masks[square], set_row_col_mask(-1, j + 1));
-
-            for (let k = 7; k >= i; k--) { // loop over redundant ranks
-                for (let l = Math.max(0, j - 1); l <= Math.min(8, j + 1); l++) {
-                    pop_bit(player_passed_masks[square], 8 * k + l);
-                }
-            }
-            for (let k = 0; k <= i; k++) { // loop over redundant ranks
-                for (let l = Math.max(0, j - 1); l <= Math.min(8, j + 1); l++) {
-                    pop_bit(ai_passed_masks[square], 8 * k + l);
-                }
-            }
-        }
-    }
 }
 
 let piece_values = [
@@ -799,56 +735,7 @@ function book_move() {
         move += game[i];
         i++;
     }
-    // Convert string move to number form
-    let row; let col; let new_row; let new_col;
-    if (move[0] == "O") {
-        row = 0;
-        col = (PLAYER_WHITE) ? 4 : 3;
-        new_row = 0;
-        if (move.length > 3) {
-            new_col = (PLAYER_WHITE) ? col - 2 : col + 2;
-        } else {
-            new_col = (PLAYER_WHITE) ? col + 2 : col - 2;
-        }
-        return create_move(8 * row + col, 8 * new_row + new_col, 11, 0, 0, 0, 0, 1);
-    }
-
-    if (move[move.length - 1] == "+") { move = move.slice(0, move.length - 1); }
-
-    if (PLAYER_WHITE) {
-        new_row = 8 - parseInt(move[move.length - 1]);
-        new_col = move[move.length - 2].charCodeAt() - 97;
-    } else {
-        new_row = parseInt(move[move.length - 1]) - 1;
-        new_col = 7 - (move[move.length - 2].charCodeAt() - 97);
-    }
-
-    let values = { "P": 0, "N": 1, "B": 2, "R": 3, "Q": 4, "K": 5 };
-    let piece_val;
-    if (move[0] == move[0].toUpperCase()) { // N B R Q K
-        piece_val = values[move[0]];
-    } else {
-        piece_val = 0;
-    }
-    piece_val += 6;
-
-    let moves = generate_pseudo_moves();
-    let target_square = 8 * new_row + new_col;
-    for (let i = 0; i < moves.length; i++) {
-        if (get_move_target(moves[i]) == target_square && get_move_piece(moves[i]) == piece_val) {
-            if (move[0].toLocaleLowerCase() == move[0]) {
-                let col = move[0].charCodeAt() - 97;
-                if (!PLAYER_WHITE) {
-                    col = 7 - col;
-                }
-                if (get_move_source(moves[i]) % 8 != col) {
-                    continue;
-                }
-            }
-            return moves[i];
-        }
-    }
-    return 0;
+    return create_move_san(move);
 }
 
 // HASHING -----------------------------------------------------------------------------------------------------------------------------------------------
@@ -895,7 +782,7 @@ class HashTable { // store score of positions previously explored at certain dep
 
 function init_zobrist() { // random number lists to xor with hash key for nearly-unique board identifiers
     let number = Math.pow(2, 32);
-    
+    ZOB_TABLE = [];
     for (let i = 0; i < 64; i++) {
         let square = [];
         for (let j = 0; j < 12; j++) {
@@ -1200,7 +1087,7 @@ function search(depth) {
     if (move) {
         console.log("Book");
         pv_table[0][0] = move;
-        return [0, 0, []];
+        return [0, 0];
     } 
 
     console.log("Lookahead:", depth);
@@ -1212,19 +1099,20 @@ function search(depth) {
 
         let res = "Depth: " + (current_depth) + ", analysed: " + (COUNT) + ", eval: " + (eval) + ", PV: ";
         for (let i = 0; i < pv_length[0]; i++) {
-            res += get_move_desc(pv_table[0][i]) + " ";
+            res += get_move_san(pv_table[0][i]) + " ";
         }
         console.log(res);
+        if (Math.abs(eval) > 99900) { break; }
     } 
     if (TURN && PLAYER_WHITE) {
         eval *= -1;
     }
     let end = Math.round(performance.now() - start);
     if (pv_table[0][0]) {
-        console.log("Best move: " + (get_move_desc(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (end));
+        console.log("Best move: " + (get_move_san(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (end));
     }
     console.log(" ");
-    return [eval, end, generate_pseudo_moves()];
+    return [eval, end];
 }
 
 // MAIN -----------------------------------------------------------------------------------------------------------------------------------------------
@@ -1239,12 +1127,8 @@ let pv_length; // ply
 let pv_table; // ply, ply
 let follow_pv; let score_pv;
 
-let row_masks; let col_masks;
-let isolated_masks;
-let player_passed_masks; let ai_passed_masks;
-
 let hash_key;
-let ZOB_TABLE = [];
+let ZOB_TABLE;
 let HASH_TABLE;
 let HASH_SIZE = 67108864;
 

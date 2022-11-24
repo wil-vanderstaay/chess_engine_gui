@@ -1,3 +1,6 @@
+function square_index(name) { return name[0].charCodeAt() - (parseInt(name[1]) << 3) - 33; }
+function square_name(index) { return String.fromCharCode(index % 8 + 97) + (8 - (index >> 3)) }
+
 // MOVE ----------------------------------------------------------------------------------------------------------------------
 /* 
     A single number to represent a move 
@@ -14,6 +17,80 @@
 function create_move(source, target, piece, promote=0, capture=0, double=0, enpassant=0, castle=0) {
     return (source) | (target << 6) | (piece << 12) | (promote << 16) | (capture << 20) | (double << 21) | (enpassant << 22) | (castle << 23);
 }
+function create_move_uci(uci) {
+    let source = square_index(uci[0] + uci[1]);
+    let target = square_index(uci[2] + uci[3]);
+    let piece = 0;
+    for (let i = 0; i < 12; i++) {
+        if (get_bit(BOARD[i], source)) {
+            piece = i;
+            break;
+        }
+    }
+    let letters = " nbrq";
+    let promote = letters.indexOf(uci.length == 5 ? uci[4] : " "); // TODO: make correct colour
+    let double = !(piece % 6) && Math.abs((source >> 3) - (target >> 3)) == 2;
+    let enpassant = !(piece % 6) && Math.abs((source % 8) - (target % 8)) == 1 && !get_bit(BOARD[14], target);
+    let capture = (enpassant || get_bit(BOARD[14], target)) ? 1 : 0;
+    let castle = piece % 6 == 5 && Math.abs((source % 8) - (target % 8)) == 2;
+    return create_move(source, target, piece, promote, capture, double, enpassant, castle);
+}
+function create_move_san(san) {
+    san = san.replace("+", "");
+    let is_promote = san.includes("=");
+    let is_pawn = san[0] != san[0].toUpperCase();
+    let letters = " NBRQK"; // TODO: check if can be lowercase??
+
+    let number_index = is_promote ? san.length - 3 : san.length - 1;
+    let target = square_index(san[number_index - 1] + san[number_index]);
+    let piece = is_pawn ? 0 : letters.indexOf(san[0]);
+    let promote = san.includes("=") ? letters.indexOf(san[san.length - 1]) : 0;
+    if (TURN) { 
+        piece += 6; 
+        if (promote) { 
+            promote += 6; 
+        }
+    }
+    let capture = san.includes("x");
+    let enpassant = capture && !get_bit(BOARD[14], target);
+    let castle = san.includes("-");
+
+    let source;
+    let bitboard;
+    switch (piece % 6) {
+        case 0: { 
+            if (capture) {
+                bitboard = and_bitboards(PAWN_ATTACK[TURN ^ 1][target], BOARD[piece]);
+            } else {
+                bitboard = and_bitboards(COL_MASKS[target], BOARD[piece]);
+            }
+            break;
+        }
+        case 1: { 
+            bitboard = and_bitboards(KNIGHT_ATTACK[target], BOARD[piece]); break;
+        }
+        case 2: { 
+            bitboard = and_bitboards(bishop_attack_fly(target, BOARD[14]), BOARD[piece]); break;
+        }
+        case 3: { 
+            bitboard = and_bitboards(rook_attack_fly(target, BOARD[14]), BOARD[piece]); break;
+        }
+        case 4: { 
+            bitboard = and_bitboards(queen_attack_fly(target, BOARD[14]), BOARD[piece]); break;
+        }
+        case 5: { 
+            bitboard = and_bitboards(KING_ATTACK[target], BOARD[piece]); break;
+        }
+    }
+    if (count_bits(bitboard) == 1) {
+        source = lsb_index(bitboard);
+    } else {
+        let mask = isNaN(san[1]) ? COL_MASKS[san[1].charCodeAt() - 97] : ROW_MASKS[parseInt(san[1]) << 3]
+        source = lsb_index(and_bitboards(bitboard, mask));
+    }
+    let double = (is_pawn && Math.abs((source >> 3) - (target >> 3)) == 2) ? 1 : 0;
+    return create_move(source, target, piece, promote, capture, double, enpassant, castle);
+}
 function get_move_source(move) { return move & 63; }
 function get_move_target(move) { return (move & 4032) >> 6; }
 function get_move_piece(move) { return (move & 61440) >> 12; }
@@ -22,110 +99,64 @@ function get_move_capture(move) { return (move & 1048576) >> 20; }
 function get_move_double(move) { return (move & 2097152) >> 21; }
 function get_move_enpassant(move) { return (move & 4194304) >> 22; }
 function get_move_castle(move) { return (move & 8388608) >> 23; }
-function get_move_uci(move) { // source square target square, eg. e2e4
+function get_move_uci(move) { 
+    let letters = " nbrq";
+    let promote = get_move_promote(move) % 6;
+    return square_name(get_move_source(move)) + square_name(get_move_target(move)) + (promote ? letters[promote] : ""); 
+}
+function get_move_san(move, moves=[]) { 
+    let uci = get_move_uci(move);
+
     let res = "";
-    let letters = 'abcdefgh';
+    let letters = ["", "N", "B", "R", "Q", "K"];
     let source = get_move_source(move);
     let target = get_move_target(move);
-    if (!PLAYER_WHITE) {
-        source = 63 - source;
-        target = 63 - target;
-    }
-    res += letters[source % 8] + (8 - (source >> 3));
-    res += letters[target % 8] + (8 - (target >> 3));
-    return res;
-}
-function get_uci_move(uci) {
-    let source = uci[0].charCodeAt() - (parseInt(uci[1]) << 3) - 33;
-    let target = uci[2].charCodeAt() - (parseInt(uci[3]) << 3) - 33;
-    if (!PLAYER_WHITE) {
-        source = 63 - source;
-        target = 63 - target;
-    }
-    let piece = 0;
-    for (let i = 0; i < 12; i++) {
-        if (get_bit(BOARD[i], source)) {
-            piece = i;
-            break;
-        }
-    } 
-    let promote = 0;
-    if (uci[4]) {
-        promote = piece + "nbrq".indexOf(uci[4]) + 1;
-    }
-    let capture = (get_bit(BOARD[14], target) || (piece % 6 == 0 && source % 8 != target % 8)) ? 1 : 0;
-    return create_move(
-        source, 
-        target,
-        piece,
-        promote,
-        capture,
-        (piece % 6 == 0 && Math.abs((source >> 3) - (target >> 3)) == 2) ? 1 : 0,
-        (piece % 6 == 0 && capture && !get_bit(BOARD[14], target)) ? 1 : 0,
-        (piece % 6 == 5 && Math.abs(source % 8 - target % 8) == 2) ? 1 : 0
-    );
-}
-function get_move_desc(move, all_moves=[]) { // all_moves requires to determine specific desc, eg. Nbg4
-    let move_source = get_move_source(move);
-    let move_target = get_move_target(move);
+    let piece = get_move_piece(move);
+    let promote = get_move_promote(move);
+    let capture = get_move_capture(move);
 
-    // Check castle moves
-    if (get_move_castle(move)) {
-        if ((PLAYER_WHITE && move_source < move_target) || (!PLAYER_WHITE && move_source > move_target)) { // kingside
-            return "O-O";
-        }
-        return "O-O-O";
-    }
-
-    let pieces = ["", "N", "B", "R", "Q", "K", "", "N", "B", "R", "Q", "K"];
-    let letters = "abcdefgh";
-    let srow = move_source >> 3; let scol = move_source % 8;
-    let trow = move_target >> 3; let tcol = move_target % 8;
-
-    if (PLAYER_WHITE) {
-        trow = 7 - trow;
-    } else {
-        letters = "hgfedcba";
-    }
-
-    let res = pieces[get_move_piece(move)]; // piece letter
-
-    // Disambiguate moves eg. Nge2
-    if (all_moves.length) {
-        for (let i = 0; i < all_moves.length; i++) {
-            // Find move that is: not this move, same piece, not needed for pawns, same target square
-            let other_move = all_moves[i];
-            if (move != other_move && get_move_piece(move) == get_move_piece(other_move) && get_move_piece(move) % 6 != 0 && move_target == get_move_target(other_move)) {
-                if (scol == get_move_source(other_move) % 8) { // use numbers
-                    if (PLAYER_WHITE) {
-                        res += (8 - srow);
-                    } else {
-                        res += (srow + 1);
-                    }
-                } else { // use letters
-                    res += letters[scol];
-                }
+    if (get_move_castle(move)) { return (source < target) ? "O-O" : "O-O-O"; }
+    
+    res += letters[piece % 6];
+    if (!res && capture) { res += uci[0]; }
+    // Disambiguate moves Nge2
+    if (moves.length) {
+        for (let i = 0; i < moves.length; i++) {
+            let m = moves[i];
+            if (m != move && piece % 6 && get_move_piece(m) == piece && get_move_target(m) == target) {
+                let ms = get_move_source(m);
+                if ((ms % 8) == (source % 8)) { res += uci[1]; }
+                else { res += uci[0]; }
+                break;
             }
         }
     }
-
-    // Check capture moves
-    if (get_move_capture(move)) { 
-        if (!res.length) { res += letters[scol]; } // pawn capture
-        res += "x";
-    }
-    res += (letters[tcol]) + (trow + 1); // move notation
-
-    // Check promotion moves
-    let move_promote = get_move_promote(move);
-    if (move_promote) { 
-        if (!pieces[move_promote]) {
-            res += "=Q"; 
+    if (get_move_capture(move)) { res += "x"; }
+    res += square_name(target);
+    if (promote) { 
+        res += "=";
+        if (promote == 15) {
+            for (let i = 0; i < 12; i++) {
+                if (get_bit(BOARD[i], target)) {
+                    res += letters[i % 6];
+                    break;
+                }
+            }
         } else {
-            res += "=" + pieces[move_promote]; 
+            res += letters[promote % 6]; 
         }
-    }
+    }    
     return res;
+}
+function print_move(move) {
+    let res = "";
+    res += (square_name(get_move_source(move))) + " " + (square_name(get_move_target(move))) + " " + (get_move_piece(move)) + ".";
+    if (get_move_promote(move)) { res += " P " + get_move_promote(move) + "."; }
+    if (get_move_capture(move)) { res += " X."; }
+    if (get_move_double(move)) { res += " D."; }
+    if (get_move_enpassant(move)) { res += " E."; }
+    if (get_move_castle(move)) { res += " O-O."; }
+    console.log(res);
 }
 
 // CASTLE ----------------------------------------------------------------------------------------------------------------------
@@ -140,7 +171,7 @@ function get_move_desc(move, all_moves=[]) { // all_moves requires to determine 
 */
 function create_castle(castle_str) {
     let res = 0;
-    let lookup = (PLAYER_WHITE) ? "KQkq" : "kqKQ";
+    let lookup = "KQkq";
     for (let i = 0; i < castle_str.length; i++) {
         res |= 1 << lookup.indexOf(castle_str[i]);
     }
@@ -157,10 +188,6 @@ let CASTLING_RIGHTS = [
     13, 15, 15, 15, 12, 15, 15, 14
 ];
 function update_castle(castle, source, target) {
-    if (!PLAYER_WHITE) {
-        source += 7 - 2 * (source % 8); // flip cols
-        target += 7 - 2 * (target % 8); // flip cols
-    }
     hash_key = xor_bitboards(hash_key, ZOB_TABLE[65][castle]);
     castle &= CASTLING_RIGHTS[source];
     castle &= CASTLING_RIGHTS[target];
@@ -169,12 +196,12 @@ function update_castle(castle, source, target) {
 }
 
 function print_castle(castle) {
-    console.log(get_castle_pk(castle) + " " + get_castle_pq(castle) + ", " + get_castle_ak(castle) + " " + get_castle_aq(castle));
+    console.log(get_castle_wk(castle) + " " + get_castle_wq(castle) + ", " + get_castle_bk(castle) + " " + get_castle_bq(castle));
 }
-function get_castle_pk(castle) { return castle & 1; }
-function get_castle_pq(castle) { return (castle & 2) >> 1; }
-function get_castle_ak(castle) { return (castle & 4) >> 2; }
-function get_castle_aq(castle) { return (castle & 8) >> 3; }
+function get_castle_wk(castle) { return castle & 1; }
+function get_castle_wq(castle) { return (castle & 2) >> 1; }
+function get_castle_bk(castle) { return (castle & 4) >> 2; }
+function get_castle_bq(castle) { return (castle & 8) >> 3; }
     
 // BITBOARD ----------------------------------------------------------------------------------------------------------------------
 /*
@@ -256,12 +283,12 @@ function copy_bitboard(bitboard) {
     return [bitboard[0], bitboard[1]];
 }
 function print_bitboard(bitboard) {
-    let res = new Array(8);
+    let res = "";
     for (let i = 0; i < 8; i++) {
-        res[i] = new Array(8);
-    }
-    for (let i = 0; i < 64; i++) {
-        res[i >> 3][i % 8] = get_bit(bitboard, i) ? 1 : 0;
+        for (let j = 0; j < 8; j++) {
+            res += get_bit(bitboard, (i << 3) + j) ? "1 " : "0 ";
+        }
+        res += "\n";
     }
     console.log(res);
 }
@@ -283,10 +310,10 @@ function create_board(board) { // board is a 64-length list containing piece val
             set_bit(res[piece - 1], i);
         }
     }
-    for (let i = 0; i < 6; i++) { // player
+    for (let i = 0; i < 6; i++) { // white
         res[12] = or_bitboards(res[12], res[i]);
     }
-    for (let i = 6; i < 12; i++) { // ai
+    for (let i = 6; i < 12; i++) { // black
         res[13] = or_bitboards(res[13], res[i]);
     }
     res[14] = or_bitboards(res[12], res[13]); // board
@@ -306,62 +333,32 @@ function legal_move(pos, new_pos) { // determine if moving from pos to new_pos i
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
         if (get_move_source(move) == pos && get_move_target(move) == new_pos) {
-            return [moves, move];
+            return [move, moves];
         }
     }
-    return [moves, 0];
+    return [0, moves];
 }
 
 function print_board(board) {
-    let res = [];
+    let letters = "PNBRQKpnbrqk";
+    let res = "";
     for (let i = 0; i < 8; i++) {
-        let row = [];
         for (let j = 0; j < 8; j++) {
-            let k = 8 * i + j;
-            let char = " ";
+            let k = (i << 3) + j;
             if (get_bit(board[14], k)) {
-                if (get_bit(board[12], k)) {
-                    if (get_bit(board[0], k)) {
-                        char = "p";
-                    } else if (get_bit(board[1], k)) {
-                        char = "n";
-                    } else if (get_bit(board[2], k)) {
-                        char = "b";
-                    } else if (get_bit(board[3], k)) {
-                        char = "r";
-                    } else if (get_bit(board[4], k)) {
-                        char = "q";
-                    } else if (get_bit(board[5], k)) {
-                        char = "k";
-                    }
-                    if (PLAYER_WHITE) {
-                        char = char.toUpperCase();
-                    }
-                } else if (get_bit(board[13], k)) {
-                    if (get_bit(board[6], k)) {
-                        char = "p";
-                    } else if (get_bit(board[7], k)) {
-                        char = "n";
-                    } else if (get_bit(board[8], k)) {
-                        char = "b";
-                    } else if (get_bit(board[9], k)) {
-                        char = "r";
-                    } else if (get_bit(board[10], k)) {
-                        char = "q";
-                    } else if (get_bit(board[11], k)) {
-                        char = "k";
-                    }
-                    if (!PLAYER_WHITE) {
-                        char = char.toUpperCase();
+                for (let p = 0; p < 12; p++) {
+                    if (get_bit(board[p], k)) {
+                        res += letters[p] + " ";
+                        break;
                     }
                 }
+            } else {
+                res += "- ";
             }
-            row.push(char);
         }
-        res.push(row);
+        res += "\n";
     }
     console.log(res);
-    console.log();
 }
 
 function do_move(move, ignore_check=false) {
@@ -402,6 +399,7 @@ function do_move(move, ignore_check=false) {
             let value = "NBRQ".indexOf(input) + 1;
             if (!value) { value = 4; }
             promote_piece = piece + value;
+            move = (move & 15794175) | (promote_piece << 16);
         }
         pop_bit(BOARD[piece], target);
         set_bit(BOARD[promote_piece], target);
@@ -410,69 +408,24 @@ function do_move(move, ignore_check=false) {
 
     // Perform enpassant
     } else if (get_move_enpassant(move)) {
-        if (TURN) {
+        if (TURN) { // black turn
             pop_bit(BOARD[0], target - 8);
             hash_key = xor_bitboards(hash_key, ZOB_TABLE[target - 8][0]);
-        } else {
+        } else { // white turn
             pop_bit(BOARD[6], target + 8);
             hash_key = xor_bitboards(hash_key, ZOB_TABLE[target + 8][6]);
         }
 
     // Perform castle 
     } else if (get_move_castle(move)) {
-        switch(target) {
-            // player white
-            case 62: // pk
-                pop_bit(BOARD[3], 63);
-                set_bit(BOARD[3], 61);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[63][3]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[61][3]);
-                break;
-            case 58: // pq
-                pop_bit(BOARD[3], 56);
-                set_bit(BOARD[3], 59);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[56][3]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[59][3]);
-                break;
-            case 6: // ak
-                pop_bit(BOARD[9], 7);
-                set_bit(BOARD[9], 5);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[7][9]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[5][9]);
-                break;
-            case 2: // aq
-                pop_bit(BOARD[9], 0);
-                set_bit(BOARD[9], 3);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[0][9]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[3][9]);
-                break;
-            
-            // player black
-            case 57: // pk
-                pop_bit(BOARD[3], 56);
-                set_bit(BOARD[3], 58);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[56][3]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[58][3]);
-                break;
-            case 61: // pq
-                pop_bit(BOARD[3], 63);
-                set_bit(BOARD[3], 60);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[63][3]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[60][3]);
-                break;
-            case 1: // ak
-                pop_bit(BOARD[9], 0);
-                set_bit(BOARD[9], 2);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[0][9]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[2][9]);
-                break;
-            case 5: // aq
-                pop_bit(BOARD[9], 7);
-                set_bit(BOARD[9], 4);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[7][9]);
-                hash_key = xor_bitboards(hash_key, ZOB_TABLE[4][9]);
-                break;
-        }
+        let kingside = (target == 62) || (target == 6); 
+        let rook_source = (kingside) ? target + 1 : target - 2;
+        let rook_target = (kingside) ? target - 1 : target + 1;
+
+        pop_bit(BOARD[piece - 2], rook_source);
+        set_bit(BOARD[piece - 2], rook_target);
+        hash_key = xor_bitboards(hash_key, ZOB_TABLE[rook_source][piece - 2]);
+        hash_key = xor_bitboards(hash_key, ZOB_TABLE[rook_target][piece - 2]);
     } 
     
     // Re-validate hash key
@@ -481,9 +434,9 @@ function do_move(move, ignore_check=false) {
     }
     EN_PASSANT_SQUARE = null;
     if (get_move_double(move)) {
-        if (TURN) {
+        if (TURN) { // black turn
             EN_PASSANT_SQUARE = target - 8;
-        } else {
+        } else { // white turn
             EN_PASSANT_SQUARE = target + 8;
         }
         hash_key = xor_bitboards(hash_key, ZOB_TABLE[66][EN_PASSANT_SQUARE]);   
@@ -494,10 +447,10 @@ function do_move(move, ignore_check=false) {
     // Update occupancies
     BOARD[12] = [0, 0];
     BOARD[13] = [0, 0];
-    for (let i = 0; i < 6; i++) { // player
+    for (let i = 0; i < 6; i++) { // white
         BOARD[12] = or_bitboards(BOARD[12], BOARD[i]);
     }
-    for (let i = 6; i < 12; i++) { // ai
+    for (let i = 6; i < 12; i++) { // black
         BOARD[13] = or_bitboards(BOARD[13], BOARD[i]);
     }
     BOARD[14] = or_bitboards(BOARD[12], BOARD[13]); // board
@@ -517,10 +470,23 @@ function do_move(move, ignore_check=false) {
 
 // DEFINE MOVES ----------------------------------------------------------------------------------------------------------------------
 
-function initialiseConstants() { // attack masks for pawns knights kings from any square 
+function initialise_constants() { // attack masks for pawns knights kings from any square 
     PAWN_ATTACK = pawn_attack(); // [side][square]
     KNIGHT_ATTACK = knight_attack(); // [square]
     KING_ATTACK = king_attack(); // [square]
+
+    init_zobrist();
+
+    ROW_MASKS = new Array(64); 
+    COL_MASKS = new Array(64);
+    for (let i = 0; i < 8; i++) {
+        let row = set_row_col_mask(i, -1);
+        let col = set_row_col_mask(-1, i);
+        for (let j = 0; j < 8; j++) {
+            ROW_MASKS[(i << 3) + j] = row;
+            COL_MASKS[(j << 3) + i] = col;
+        }
+    }
 
     function pawn_attack() {
         let res = [new Array(64), new Array(64)];
@@ -584,6 +550,21 @@ function initialiseConstants() { // attack masks for pawns knights kings from an
         }
         return res;
     }
+
+    function set_row_col_mask(row, col) {
+        let res = [0, 0];
+        if (row >= 0) {
+            for (let i = 0; i < 8; i++) {
+                set_bit(res, (row << 3) + i);
+            }
+        } 
+        if (col >= 0) {
+            for (let i = 0; i < 8; i++) {
+                set_bit(res, (i << 3) + col);
+            }
+        } 
+        return res;
+    }
 }
 
 function bishop_attack_fly(square, blocker) {
@@ -615,7 +596,6 @@ function bishop_attack_fly(square, blocker) {
     }
     return res;
 }
-
 function rook_attack_fly(square, blocker) {
     let res = [0, 0];
     let r = square >> 3; let c = square % 8;
@@ -652,20 +632,21 @@ function queen_attack_fly(square, blocker) {
 // GENERATE MOVES ----------------------------------------------------------------------------------------------------------------------
 
 function is_square_attacked(square, side) {
-    // Attacked by player pawns
+    let att_piece = side * 6;
+    // Attacked by white pawns
     if (!side && bool_bitboard(and_bitboards(PAWN_ATTACK[1][square], BOARD[0]))) { return 1; }
-    // Attacked by ai pawns
+    // Attacked by black pawns
     if (side && bool_bitboard(and_bitboards(PAWN_ATTACK[0][square], BOARD[6]))) { return 1; }
     // Attacked by knights
-    if (bool_bitboard(and_bitboards(KNIGHT_ATTACK[square], side ? BOARD[7] : BOARD[1]))) { return 2; }
+    if (bool_bitboard(and_bitboards(KNIGHT_ATTACK[square], BOARD[att_piece + 1]))) { return 2; }
     // Attacked by bishops
-    if (bool_bitboard(and_bitboards(bishop_attack_fly(square, BOARD[14]), side ? BOARD[8] : BOARD[2]))) { return 3; }
+    if (bool_bitboard(and_bitboards(bishop_attack_fly(square, BOARD[14]), BOARD[att_piece + 2]))) { return 3; }
     // Attacked by rooks
-    if (bool_bitboard(and_bitboards(rook_attack_fly(square, BOARD[14]), side ? BOARD[9] : BOARD[3]))) { return 4; }
+    if (bool_bitboard(and_bitboards(rook_attack_fly(square, BOARD[14]), BOARD[att_piece + 3]))) { return 4; }
     // Attacked by queens
-    if (bool_bitboard(and_bitboards(queen_attack_fly(square, BOARD[14]), side ? BOARD[10] : BOARD[4]))) { return 5; }
+    if (bool_bitboard(and_bitboards(queen_attack_fly(square, BOARD[14]), BOARD[att_piece + 4]))) { return 5; }
     // Attacked by kings
-    if (bool_bitboard(and_bitboards(KING_ATTACK[square], side ? BOARD[11] : BOARD[5]))) { return 6; }
+    if (bool_bitboard(and_bitboards(KING_ATTACK[square], BOARD[att_piece + 5]))) { return 6; }
     
     return 0;
 }
@@ -684,9 +665,9 @@ function generate_pseudo_moves() {
         if (0 <= target && target < 64 && !get_bit(BOARD[14], target)) {
             let trow = target >> 3;
             if (trow == 0 || trow == 7) { // promotion
-                moves.push(create_move(source, target, piece, piece + 1)); // rook
-                moves.push(create_move(source, target, piece, piece + 2)); // knight
-                moves.push(create_move(source, target, piece, piece + 3)); // bishop
+                moves.push(create_move(source, target, piece, piece + 1)); // knight
+                moves.push(create_move(source, target, piece, piece + 2)); // bishop
+                moves.push(create_move(source, target, piece, piece + 3)); // rook
                 moves.push(create_move(source, target, piece, piece + 4)); // queen
             } else {
                 // One square push
@@ -796,29 +777,18 @@ function generate_pseudo_moves() {
 
     // Castling
     if (CASTLE) {
-        let king_pos = [60, 4][TURN];
-        let king_side = [[61, 62], [5, 6]][TURN];
-        let queen_side = [[59, 58, 57], [3, 2, 1]][TURN];
-        if (!PLAYER_WHITE) {
-            king_pos--;
-            king_side[0] -= 3;
-            king_side[1] -= 5;
-            queen_side[0] += 1;
-            queen_side[1] += 3;
-            queen_side[2] += 5;
-        }
-
-        if ((!TURN && get_castle_pk(CASTLE)) || (TURN && get_castle_ak(CASTLE))) {
-            if (!get_bit(BOARD[14], king_side[0]) && !get_bit(BOARD[14], king_side[1])) {
-                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_side[0], TURN ^ 1)) {
-                    moves.push(create_move(king_pos, king_side[1], piece, 0, 0, 0, 0, 1));
+        let king_pos = TURN ? 4 : 60;
+        if (get_castle_wk(CASTLE) || get_castle_bk(CASTLE)) {
+            if (!get_bit(BOARD[14], king_pos + 1) && !get_bit(BOARD[14], king_pos + 2)) {
+                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos + 1, TURN ^ 1)) {
+                    moves.push(create_move(king_pos, king_pos + 2, piece, 0, 0, 0, 0, 1));
                 }
             }
         }
-        if ((!TURN && get_castle_pq(CASTLE)) || (TURN && get_castle_aq(CASTLE))) {
-            if (!get_bit(BOARD[14], queen_side[0]) && !get_bit(BOARD[14], queen_side[1]) && !get_bit(BOARD[14], queen_side[2])) {
-                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(queen_side[0], TURN ^ 1)) {
-                    moves.push(create_move(king_pos, queen_side[1], piece, 0, 0, 0, 0, 1));
+        if (get_castle_wq(CASTLE) || get_castle_bq(CASTLE)) {
+            if (!get_bit(BOARD[14], king_pos - 1) && !get_bit(BOARD[14], king_pos - 2) && !get_bit(BOARD[14], king_pos - 3)) {
+                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos - 1, TURN ^ 1)) {
+                    moves.push(create_move(king_pos, king_pos - 2, piece, 0, 0, 0, 0, 1));
                 }
             }
         }
@@ -840,11 +810,7 @@ function generate_capture_moves() {
 function finish() {
     let message = "Stalemate";
     if (is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
-        if (PLAYER_WHITE) {
-            message = "Checkmate. " + (TURN ? "White" : "Black") + " wins";
-        } else {
-            message = "Checkmate. " + (TURN ? "Black" : "White") + " wins";
-        }
+        message = "Checkmate. " + (TURN ? "White" : "Black") + " wins";
     } else {
         let moves = generate_pseudo_moves();
         for (let i = 0; i < moves.length; i++) {
@@ -862,6 +828,7 @@ function finish() {
 function run_setup_board() {
     let button = document.getElementById("setup");
     if (button.style.backgroundColor == "rgb(187, 224, 174)") {
+        console.log("HERE");
         if (count_bits(BOARD[5]) != 1 || count_bits(BOARD[11]) != 1) {
             alert("Invalid position");
             setup_board();
@@ -889,11 +856,10 @@ function add_piece() {
     let input = window.prompt("Add a piece to the board\nW/B then P N B R Q K: ");
     if (!input) { return; }
     input = input.toUpperCase();
-    let value = { "P": 0, "N": 1, "B": 2, "R": 3, "Q": 4, "K": 5 };
-    if (input.length != 2 || !Object.keys(value).includes(input[1]) || !"WB".includes(input[0])) { return; }
+    let letters = "PNBRQK";
+    if (input.length != 2 || !letters.includes(input[1]) || !"WB".includes(input[0])) { return; }
 
-    let letter = PLAYER_WHITE ? "W" : "B"
-    promote_piece = (input[0] == letter ? 0 : 6) + value[input[1]];
+    let promote_piece = (input[0] == "W" ? 0 : 6) + letters.indexOf(input[1]);
     for (let i = 0; i < 64; i++) {
         if (!get_bit(BOARD[14], i)) {
             set_bit(BOARD[promote_piece], i);
@@ -967,7 +933,6 @@ function undo_move() {
     GAME_HASH.pop();
 
     display_board();
-    doHumanMove();
 }
 
 function copy_to_clipboard(text) {
@@ -987,10 +952,10 @@ function open_chess_com() {
     }
 }
 function open_lichess() {
-    import_pgn(get_pgn(document.getElementById("stored_fen").value));
+    import_pgn(get_pgn());
 }
 
-function get_pgn(from_fen="") {
+function get_pgn() {
     let res = `[Event "?"]
     [Site "?"]
     [Date "????.??.??"]
@@ -1006,7 +971,8 @@ function get_pgn(from_fen="") {
     res += `"]
     [Result "*"]
     `
-    if (from_fen) {
+    let from_fen = document.getElementById("stored_fen").value;
+    if (from_fen != START_FEN) {
         res += `[FEN "` + from_fen + `"]`
     }
 
@@ -1018,34 +984,17 @@ function get_pgn(from_fen="") {
 }
 
 function get_fen() {
-    let values; let castle; let en_pass;
-    let start; let direction;
-    if (PLAYER_WHITE) {
-        values = "PNBRQKpnbrqk";
-        castle = (get_castle_pk(CASTLE) ? "K" : "") + (get_castle_pq(CASTLE) ? "Q" : "") + (get_castle_ak(CASTLE) ? "k" : "") + (get_castle_aq(CASTLE) ? "q" : "");
-        if (EN_PASSANT_SQUARE) {
-            en_pass = String.fromCharCode(97 + EN_PASSANT_SQUARE % 8) + (((64 - EN_PASSANT_SQUARE) >> 3) + 1);
-        } else {
-            en_pass = "-";
-        }
-        start = 0; direction = 1;
-    } else {
-        values = "pnbrqkPNBRQK";
-        castle = (get_castle_pk(CASTLE) ? "k" : "") + (get_castle_pq(CASTLE) ? "q" : "") + (get_castle_ak(CASTLE) ? "K" : "") + (get_castle_aq(CASTLE) ? "Q" : "");
-        if (EN_PASSANT_SQUARE) {
-            en_pass = String.fromCharCode(97 + 7 - EN_PASSANT_SQUARE % 8) + ((EN_PASSANT_SQUARE >> 3) + 1);
-        } else {
-            en_pass = "-";
-        }
-        start = 7; direction = -1;
-    }
+    let values = "PNBRQKpnbrqk";
+
+    let castle = (get_castle_wk(CASTLE) ? "K" : "") + (get_castle_wq(CASTLE) ? "Q" : "") + (get_castle_bk(CASTLE) ? "k" : "") + (get_castle_bq(CASTLE) ? "q" : "");
     if (!castle.length) { castle = "-"; }
-    let res = ""; let count = 0;
-    let i = start;
-    while (0 <= i && i <= 7) {
-        let j = start;
-        while (0 <= j && j <= 7) {
-            let p = 8 * i + j;
+    let en_pass = EN_PASSANT_SQUARE ? square_index(EN_PASSANT_SQUARE) : "-";
+
+    let res = ""; 
+    let count = 0;
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            let p = (i << 3) + j;
             if (get_bit(BOARD[14], p)) {
                 if (count) {
                     res += (count);
@@ -1054,23 +1003,21 @@ function get_fen() {
                 for (let k = 0; k < 12; k++) {
                     if (get_bit(BOARD[k], p)) {
                         res += values[k];
+                        break;
                     }
                 }
             } else {
                 count++;
             }
-            j += direction;
         }
         if (count) {
             res += (count);
         }
         count = 0;
         res += "/";
-
-        i += direction;
     }
 
-    res = res.slice(0, res.length - 1) + " " + (PLAYER_WHITE ^ TURN ? "w" : "b") + " " + castle + " " + en_pass + " 0 1";
+    res = res.slice(0, res.length - 1) + " " + (TURN ? "b" : "w") + " " + castle + " " + en_pass + " 0 1";
     copy_to_clipboard(res);
     return res;
 }
@@ -1090,57 +1037,10 @@ function get_move_number() {
     return (GAME_MOVES.length >> 1) + 1;
 }
 
-function flip_fen(fen) {
-    let res = "";
-    let i = 0;
-    while (i < fen.length) {
-        let row = "";
-        while (i < fen.length && fen[i] != "/" && fen[i] != " ") {
-            row += fen[i];
-            i++;
-        }
-        let rev_row = "";
-        for (let j = row.length - 1; j >= 0; j--) {
-            rev_row += row[j];
-        }
-        res = rev_row + res;
-        if (fen[i] == " ") {
-            res += " " + fen[i + 1] + " ";
-            if (fen[i + 3] != "-") {
-                while (fen[i + 3] != " ") {
-                    res += fen[i + 3];
-                    i++;
-                }
-            } else { res += "-"; }
-            res += " ";
-            if (fen[i + 4] != "-") {
-                let letters = {"a": "h", "b": "g", "c": "f", "d": "e", "f": "c", "g": "b", "h": "a"};
-                res += letters[fen[i + 4]];
-                let new_num = 9 - parseInt(fen[i + 5]);
-                res += new_num.toString();
-            } else { res += "-"; }
-            res += " " + fen[fen.length - 3] + " " + fen[fen.length - 1];
-            return res;
-        } else {
-            res = fen[i] + res;
-        }
-        i++;
-    } 
-    return res;
-}
-
-function square_to_pos(square) {
-    let res = square[0].charCodeAt() - (parseInt(square[1]) << 3) - 33;
-    if (!PLAYER_WHITE) {
-        res = 63 - res;
-    }
-    return res;
-}
-
-function make_table(player_white) {
+function make_table() {
     let table = '<table id="chess-table" class="chess-board">';
-    let row_order = player_white ? "87654321" : "12345678";
-    let col_order = player_white ? "abcdefgh" : "hgfedcba";
+    let row_order = PLAYER_WHITE ? "87654321" : "12345678";
+    let col_order = PLAYER_WHITE ? "abcdefgh" : "hgfedcba";
     for (let row = 0; row < 8; row++) {
         table += '<tr>';
         for (let col = 0; col < 8; col++) {
@@ -1180,11 +1080,13 @@ function make_board(fen) {
     }
 
     TURN = split_fen[1] == "w" ? 0 : 1;
+    CASTLE = 0;
     if (split_fen[2] != "-") {
         CASTLE = create_castle(split_fen[2]);
     }
+    EN_PASSANT_SQUARE = 0;
     if (split_fen[3] != "-") { 
-        EN_PASSANT_SQUARE = square_to_pos(split_fen[3]);
+        EN_PASSANT_SQUARE = square_index(split_fen[3]);
     }
     return create_board(res);
 }
@@ -1220,16 +1122,22 @@ function display_board() {
 
     for (let i = 0; i < 64; i++) {
         let piece_location = table.rows.item(i >> 3).cells.item(i % 8);
-        piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
+        piece_location.style.background = "";
         piece_location.innerHTML = remove_img_div(piece_location.innerHTML);
         
-        if (get_bit(BOARD[14], i)) {
+        let b = (PLAYER_WHITE) ? i : 63 - i;
+        if (get_bit(BOARD[14], b)) {
             for (let j = 0; j < 12; j++) {
-                if (get_bit(BOARD[j], i)) {
-                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
-                    let piece = '<img draggable="false" style="width: ' + (width - 10) + 'px; height: ' + (width - 10) + 'px;" src="../imgs/chess_pieces/' + (piece_number) + '.png">';
-                    piece_location.innerHTML += '<div id="' + (i) + '" class="chess-piece">' + piece + '</div>';
-                    pieceDrag(document.getElementById((i)), i, false);
+                if (get_bit(BOARD[j], b)) {
+                    let piece = '<img draggable="false" style="width: ' + (width - 10) + 'px; height: ' + (width - 10) + 'px;" src="../imgs/chess_pieces/' + (j) + '.png">';
+                    
+                    let piece_div = document.createElement('div');
+                    piece_div.id = i;
+                    piece_div.className = "chess-piece";
+                    piece_div.innerHTML = piece;
+                    piece_location.appendChild(piece_div);
+
+                    pieceDrag(piece_div, i, !((j < 6) ^ PLAYER_WHITE));
                     break;
                 }
             }
@@ -1244,104 +1152,16 @@ function highlightLastMove(last_move) {
     let move_source = get_move_source(last_move);
     let move_target = get_move_target(last_move);
 
+    if (!PLAYER_WHITE) {
+        move_source = 63 - move_source;
+        move_target = 63 - move_target;
+    }
+
     let s_location = table.rows.item(move_source >> 3).cells.item(move_source % 8);
     let t_location = table.rows.item(move_target >> 3).cells.item(move_target % 8);
 
     s_location.style.background = (s_location.className == "light") ? lcode : dcode;
     t_location.style.background = (t_location.className == "light") ? lcode : dcode;
-}
-
-function doAiMove() {
-    let res = search(LOOKAHEAD);
-    let evaluation = res[0]; let time = res[1]; let moves = res[2];
-    let best_move = pv_table[0][0];
-
-    if (!do_move(best_move)) {
-        finish();
-        return false;
-    }
-
-    let md = get_move_desc(best_move, moves);
-    GAME.push(copy_board(BOARD));
-    GAME_MOVES.push(md);
-    GAME_HASH.push(hash_key);
-
-    evaluation = Math.round(evaluation + Number.EPSILON);
-    if (Math.abs(evaluation) > 99900) {
-        if (Math.abs(evaluation) == 99999) { setTimeout(() => {  return finish(); }, 250); }
-        evaluation = (evaluation < 0 ? "-" : "") + "M" + ((100000 - Math.abs(evaluation)) / 2 << 0);
-        if (evaluation.includes("-")) {
-            document.getElementById("black-eval").innerText = evaluation;
-            document.getElementById("white-eval").innerText = "";
-            evaluation = -99;
-        }  else {
-            document.getElementById("black-eval").innerText = "";
-            document.getElementById("white-eval").innerText = evaluation;
-            evaluation = 99;
-        }
-
-    } else {
-        evaluation /= 100; 
-        evaluation = Math.round((evaluation + Number.EPSILON) * 10) / 10;
-        if (Math.abs(evaluation).toString().length > 3) { evaluation = Math.round(evaluation); }
-        
-        if (evaluation >= 0) { // white winning
-            document.getElementById("black-eval").innerText = "";
-            document.getElementById("white-eval").innerText = evaluation;
-        } else { // if (evaluation < 0) {
-            document.getElementById("black-eval").innerText = Math.abs(evaluation);
-            document.getElementById("white-eval").innerText = "";
-        }
-    }
-    if (PLAYER_WHITE) { evaluation *= -1; }
-    else {
-        // let temp = document.getElementById("black-eval").innerText
-        // document.getElementById("black-eval").innerText = document.getElementById("white-eval").innerText;
-        // document.getElementById("white-eval").innerText = temp;
-    }
-    document.getElementById("eval-bar").style.height = Math.min(Math.max(56 * Math.tanh(evaluation / 5) + 50, 0), 100) + "%";
-
-    if (time == 0) { evaluation = "Book"; }
-    if (is_repetition()) { setTimeout(() => {  return finish(); }, 250); }
-
-    if (time == 0) {
-        // book move
-    } else if (time < 750) { // under 0.75s, INCREASE
-        LOOKAHEAD_COUNT = 2;
-    } else if (time < 1500) {
-        LOOKAHEAD_COUNT++;
-    } else if (time > 15000) { // over 15s, DECREASE
-        LOOKAHEAD_COUNT = -2;
-    } else if (time > 7500) {
-        LOOKAHEAD_COUNT--;
-    }
-
-    if (LOOKAHEAD_COUNT >= 2) { // 2 fast moves
-        LOOKAHEAD++;
-        LOOKAHEAD_COUNT = 0;
-    } else if (LOOKAHEAD_COUNT <= -2) { // 2 slow moves
-        LOOKAHEAD--;
-        LOOKAHEAD_COUNT = 0
-    }
-    display_board();
-    highlightLastMove(best_move);
-
-    return true;
-}
-
-function doHumanMove() {
-    for (let i = 0; i < 64; i++) {
-        if (get_bit(BOARD[14], i)) {
-            for (let j = 0; j < 12; j++) {
-                if (get_bit(BOARD[j], i)) {
-                    let piece_number = (j + 6 * !PLAYER_WHITE) % 12;
-                    let piece_white = piece_number < 6;
-                    pieceDrag(document.getElementById((i)), i, !(piece_white ^ PLAYER_WHITE));
-                    break;
-                }
-            }
-        }
-    }
 }
 
 let SELECTED_PIECE = 64;
@@ -1362,7 +1182,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         for (let i = 0; i < 64; i++) {
             let piece_location = table.rows.item(i >> 3).cells.item(i % 8);
             if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
-                piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
+                piece_location.style.background = "";
             }
             piece_location.onclick = null;
         }
@@ -1386,7 +1206,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         document.onmousemove = null;
 
         let row_diff = Math.round(div.offsetTop / width);
-        let col_diff = Math.round(div.offsetLeft / width)
+        let col_diff = Math.round(div.offsetLeft / width);
         let new_pos = pos + (row_diff << 3) + col_diff;
         div.style.top = (width * row_diff + top_offset) + "px";
         div.style.left = (width * col_diff + left_offset) + "px";
@@ -1404,15 +1224,8 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 val += image[i];
             }
             val = parseInt(val);
-            if (!PLAYER_WHITE) { 
-                if (val < 6) { val += 6; }
-                else { val -= 6; }    
-            }
             let m = create_move(pos, new_pos, val, 0, get_bit(BOARD[14], new_pos) ? 1 : 0);
             TURN = val < 6 ? 0 : 1;
-            if (!PLAYER_WHITE) {
-                TURN ^= 1;
-            }
             do_move(m, true);
 
             display_board();
@@ -1475,44 +1288,113 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         }
     }
 
-    function doLegalMove(target) {
-        let res = legal_move(pos, target);
-        let moves = res[0]; let move = res[1];
+    function doLegalMove(new_pos) {
+        let source = PLAYER_WHITE ? pos : 63 - pos;
+        let target = PLAYER_WHITE ? new_pos : 63 - new_pos;
+        let res = legal_move(source, target);
+        let move = res[0]; 
+        let moves = res[1];
         if (move) {
             if (get_move_promote(move)) { // ask for promote input
                 move |= 983040; // set promote 15
             }
             if (do_move(move)) {
-                if (STOCKFISH_ID) {
-                    post_human_move(get_move_uci(move));
-                }
                 GAME.push(copy_board(BOARD));
-                GAME_MOVES.push(get_move_desc(move, moves));
+                GAME_MOVES.push(get_move_san(move, moves));
                 GAME_HASH.push(hash_key);
 
                 document.getElementById("loading").innerHTML = "LOADING";
                 
                 setTimeout(() => {  
-
-                    if (loading) {
-                        loading.innerHTML = "";
-                    }
+                    document.getElementById("loading").innerHTML = "";
                     display_board(move); 
                     doAiMove();
-                    doHumanMove();
-
                 }, 250);
                 return true;
             }
-            let king_pos = TURN ? lsb_index(BOARD[11]) : lsb_index(BOARD[5]);
+            let king_pos = lsb_index(BOARD[TURN ? 11 : 5]);
             let king_location = document.getElementById("chess-table").rows.item(king_pos >> 3).cells.item(king_pos % 8);
             king_location.style.background = "#FF0000"; // RED
             setTimeout(() => {
-                king_location.style.background = (king_location.className == "light") ? "#f1d9c0" : "#a97a65";
+                king_location.style.background = "";
             }, 250);
         }
         return false;
     }
+}
+
+function doAiMove() {
+    let res = search(LOOKAHEAD);
+    let evaluation = res[0]; 
+    let time = res[1];
+
+    let best_move = pv_table[0][0];
+    let moves = generate_pseudo_moves();
+
+    if (!do_move(best_move)) {
+        finish();
+        return false;
+    }
+
+    GAME.push(copy_board(BOARD));
+    GAME_MOVES.push(get_move_san(best_move, moves));
+    GAME_HASH.push(hash_key);
+
+    evaluation = Math.round(evaluation + Number.EPSILON);
+    if (Math.abs(evaluation) > 99900) {
+        if (Math.abs(evaluation) == 99999) { setTimeout(() => {  return finish(); }, 250); }
+        evaluation = (evaluation < 0 ? "-" : "") + "M" + ((100000 - Math.abs(evaluation)) / 2 << 0);
+        if (evaluation.includes("-")) {
+            document.getElementById("black-eval").innerText = evaluation;
+            document.getElementById("white-eval").innerText = "";
+            evaluation = -99;
+        }  else {
+            document.getElementById("black-eval").innerText = "";
+            document.getElementById("white-eval").innerText = evaluation;
+            evaluation = 99;
+        }
+
+    } else {
+        evaluation /= 100; 
+        evaluation = Math.round((evaluation + Number.EPSILON) * 10) / 10;
+        if (Math.abs(evaluation).toString().length > 3) { evaluation = Math.round(evaluation); }
+        
+        if (evaluation >= 0) { // white winning
+            document.getElementById("black-eval").innerText = "";
+            document.getElementById("white-eval").innerText = evaluation;
+        } else { // if (evaluation < 0) {
+            document.getElementById("black-eval").innerText = Math.abs(evaluation);
+            document.getElementById("white-eval").innerText = "";
+        }
+    }
+    if (PLAYER_WHITE) { evaluation *= -1; }
+    document.getElementById("eval-bar").style.height = Math.min(Math.max(56 * Math.tanh(evaluation / 5) + 50, 0), 100) + "%";
+
+    if (is_repetition()) { setTimeout(() => {  return finish(); }, 250); }
+
+    if (time == 0) {
+        // book move
+    } else if (time < 750) { // under 0.75s, INCREASE
+        LOOKAHEAD_COUNT = 2;
+    } else if (time < 1500) {
+        LOOKAHEAD_COUNT++;
+    } else if (time > 15000) { // over 15s, DECREASE
+        LOOKAHEAD_COUNT = -2;
+    } else if (time > 7500) {
+        LOOKAHEAD_COUNT--;
+    }
+
+    if (LOOKAHEAD_COUNT >= 2) { // 2 fast moves
+        LOOKAHEAD++;
+        LOOKAHEAD_COUNT = 0;
+    } else if (LOOKAHEAD_COUNT <= -2) { // 2 slow moves
+        LOOKAHEAD--;
+        LOOKAHEAD_COUNT = 0
+    }
+    display_board();
+    highlightLastMove(best_move);
+
+    return true;
 }
 
 function upload_game() {
@@ -1554,7 +1436,7 @@ const get_tablebase = async () => {
         if (res["category"] == "win" || res["category"] == "loss") {
             eval = 1000;
         }
-        let move = get_uci_move(res["uci"]);
+        let move = create_move_uci(res["uci"]);
     }
 }
 
@@ -1618,9 +1500,13 @@ function prepare_game(whiteDown, fen, lookahead) {
     LOOKAHEAD = lookahead;
     STOCKFISH_ID = "";
 
-    make_table(whiteDown);
+    make_table();
     BOARD = make_board(fen);
+    console.log(CASTLE);
+    console.log(EN_PASSANT_SQUARE);
+    console.log(TURN);
     hash_key = init_hash();
+    HASH_TABLE = new HashTable();
 
     document.getElementById("setup").style.backgroundColor = "";
 
@@ -1646,10 +1532,9 @@ function prepare_game(whiteDown, fen, lookahead) {
     }
 
     display_board();
-    initialise_ai_constants();
 }
 
-function start_game(whiteDown, fen=START_FEN, lookahead=6, stockfish=false) {
+function start_game(whiteDown, fen=START_FEN, lookahead=6) {
     let stored_fen = document.getElementById("stored_fen").value;
     if (fen == START_FEN && stored_fen) { fen = stored_fen; }
     if (!fen) { fen = START_FEN; } 
@@ -1662,14 +1547,9 @@ function start_game(whiteDown, fen=START_FEN, lookahead=6, stockfish=false) {
         document.getElementById("stored_fen").value = START_FEN;
     }
 
-    if (stockfish) {
-        play_stockfish();
-    }
-
-    if (TURN) {
+    if (!(TURN ^ PLAYER_WHITE)) {
         doAiMove();
     }
-    doHumanMove();
 }
 
 let START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -1677,6 +1557,9 @@ let START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 let PAWN_ATTACK;
 let KNIGHT_ATTACK;
 let KING_ATTACK;
+
+let ROW_MASKS; 
+let COL_MASKS;
 
 let PLAYER_WHITE;
 let TURN; // 0 for player, 1 for ai
@@ -1694,8 +1577,7 @@ let GAME; // for easy undo move
 let GAME_HASH;
 let GAME_MOVES;
 
-initialiseConstants();
-initialise_ai_constants();
+initialise_constants();
 
 let tricky_fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
 start_game(true);

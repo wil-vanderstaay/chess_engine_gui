@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title></title>
-        <meta charset="UTF-8">
+        <title>Wil's Java Chess</title>
         <style>            
             .chess-board { border-spacing: 0; user-select: none; }
             .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
@@ -53,11 +52,7 @@
     <script src="./env.js"></script>
     <script src="./chess.js"></script>
     <script>
-        function resize() {
-            display_board();
-            doHumanMove();
-        }
-        window.onresize = resize;
+        window.onresize = () => { display_board(); };
     </script>
 
 </html>
