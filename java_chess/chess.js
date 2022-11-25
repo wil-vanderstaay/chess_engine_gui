@@ -468,7 +468,6 @@ function do_move(move, ignore_check=false) {
     return true;
 }
 
-// HASHING ----------------------------------------------------------------------------------------------------------------------
 // HASHING -----------------------------------------------------------------------------------------------------------------------------------------------
 
 class HashEntry {
@@ -501,7 +500,7 @@ class HashTable { // store score of positions previously explored at certain dep
         return [0, null];
     }
 
-    set(depth, flag, score, move=0) {
+    set(depth, flag, score, move) {
         let entry = new HashEntry();
         entry.first = hash_key[0];
         entry.last = hash_key[1];
@@ -748,7 +747,7 @@ function generate_pseudo_moves() {
     // Pawn moves
     let piece = 6 * TURN;
     let piece_board = copy_bitboard(BOARD[piece]);
-    let pawn_direction = [-1, 1][TURN] << 3;
+    let pawn_direction = TURN ? 8 : -8;
     while (bool_bitboard(piece_board)) {
         let source = pop_lsb_index(piece_board);
         let target = source + pawn_direction;
@@ -766,7 +765,7 @@ function generate_pseudo_moves() {
                 moves.push(create_move(source, target, piece));
                 // Two square push
                 let srow = source >> 3;
-                if (srow == [6, 1][TURN] && !get_bit(BOARD[14], target + pawn_direction)) {
+                if (srow == (TURN ? 1 : 6) && !get_bit(BOARD[14], target + pawn_direction)) {
                     moves.push(create_move(source, target + pawn_direction, piece, 0, 0, 1));
                 }
             }
@@ -1708,7 +1707,7 @@ let GAME_MOVES;
 initialise_constants();
 
 let tricky_fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
-start_game(true);
+start_game(true, tricky_fen);
 
 /*
     AI (WHITE) vs AI2 (BLACK)  ->  AI2 has no endgame evaluation

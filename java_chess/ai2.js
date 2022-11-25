@@ -1,6 +1,7 @@
 function reset_search_tables() {
     COUNT = 0; 
     LOOKUP = 0;
+    ply = 0;
     follow_pv = 0; 
     score_pv = 0;
 
@@ -255,6 +256,7 @@ function best_eval_captures(depth, alpha, beta) {
         let cb = copy_board(BOARD);
         let cc = CASTLE;
         let copy_en = EN_PASSANT_SQUARE;
+        let ch = copy_bitboard(hash_key);
 
         if (!do_move(move)) {
             continue;
@@ -264,12 +266,13 @@ function best_eval_captures(depth, alpha, beta) {
         ply++;
         let eval = -best_eval_captures(depth - 1, -beta, -alpha);
         ply--;
+        GAME_HASH.pop();
     
         BOARD = cb;
         CASTLE = cc;
         EN_PASSANT_SQUARE = copy_en;
         TURN ^= 1;
-        hash_key = GAME_HASH.pop();
+        hash_key = ch;
 
         if (eval >= beta) { // oppenent response too strong, snip
             return beta
@@ -307,31 +310,24 @@ function best_eval(depth, alpha, beta) {
         let cb = copy_board(BOARD);
         let cc = CASTLE;
         let copy_en = EN_PASSANT_SQUARE;
-        let copy_turn = TURN;
-        let copy_hash = copy_bitboard(hash_key);
+        let ch = copy_bitboard(hash_key);
 
         if (!do_move(move)) {
             continue;
         }
         legal_moves = true;
 
-        GAME.push(copy_board(BOARD));
         GAME_HASH.push(copy_bitboard(hash_key));
-        GAME_MOVES.push(get_move_uci(move));
-
         ply++;
         let eval = -best_eval(depth - 1, -beta, -alpha);
         ply--;
-
-        GAME.pop();
         GAME_HASH.pop();
-        GAME_MOVES.pop();
 
         BOARD = cb;
         CASTLE = cc;
         EN_PASSANT_SQUARE = copy_en;
-        TURN = copy_turn;
-        hash_key = copy_hash;
+        TURN ^= 1;
+        hash_key = ch;
 
         if (eval > alpha) {
             hash_flag = 1;
@@ -379,7 +375,7 @@ function search(depth) {
         eval = best_eval(current_depth, -Infinity, Infinity);
         if (PLAYER_WHITE) { eval *= -1; }
 
-        let res = "Depth: " + (current_depth) + ", analysed: " + (COUNT) + ", eval: " + (eval) + ", PV: ";
+        let res = "Depth: " + (current_depth) + ", analysed: " + (COUNT) + ", lookup: " + (LOOKUP) + ", eval: " + (eval) + ", PV: ";
         for (let i = 0; i < pv_length[0]; i++) {
             res += get_move_san(pv_table[0][i]) + " ";
         }
