@@ -132,32 +132,46 @@ let piece_position_values = [
     ]
 ];
 
-function piece_val_map(piece, pos) {
-    if (piece >= 6) {
-        piece -= 6;
-        pos += 56 - (pos >> 3 << 4); // flip rows
+function get_gamephase_score() {
+    let res = 0;
+    for (let i = 1; i < 5; i++) {
+        res += count_bits(BOARD[i]) * piece_values[i];
+        res += count_bits(BOARD[i + 6]) * piece_values[i];
     }
-    return piece_values[piece] + piece_position_values[piece][pos];
-    return piece_values[piece + 6] + piece_position_values[piece + 6][pos]; 
+    return res;
 }
 
 function evaluate_board() {
-    let res = 0;
-    for (let p = 0; p < 5; p++) {
+    let opening_res = 0;
+    let endgame_res = 0;
+    for (let p = 0; p < 6; p++) {
         let bitboard = copy_bitboard(BOARD[p]);
         while (bool_bitboard(bitboard)) {
-            res += piece_val_map(p, pop_lsb_index(bitboard));
+            let index = pop_lsb_index(bitboard);
+            opening_res += piece_values[p] + piece_position_values[p][index];
+            endgame_res += piece_values[p + 6] + piece_position_values[p + 6][index]; 
         }
-
         bitboard = copy_bitboard(BOARD[p + 6]);
         while (bool_bitboard(bitboard)) {
-            res -= piece_val_map(p + 6, pop_lsb_index(bitboard));
+            let index = pop_lsb_index(bitboard);
+            index += (7 - (index >> 3 << 1)) << 3; // flip rows
+            opening_res -= piece_values[p] + piece_position_values[p][index];
+            endgame_res -= piece_values[p + 6] + piece_position_values[p + 6][index]; 
         }
     }
+
+    let gamephase_score = get_gamephase_score();
+    if (gamephase_score > opening_phase) { // OPENING
+        return (TURN) ? -opening_res : opening_res;
+    } else if (gamephase_score < endgame_phase) { // ENDGAME
+        return (TURN) ? -endgame_res : endgame_res;
+    }
+    // MIDDLEGAME
+    let res = (opening_res * gamephase_score + endgame_res * (opening_phase - gamephase_score)) / opening_phase << 0;
     return (TURN) ? -res : res;
 }
 
-function score_move(move, attackers, defenders) {
+function score_move(move, defenders) {
     if (score_pv && move == pv_table[0][ply]) {
         score_pv = 0;
         return 200;
@@ -166,9 +180,17 @@ function score_move(move, attackers, defenders) {
     let target = get_move_target(move); 
     let piece = get_move_piece(move);
     let piece_type = piece % 6;
+    
+    // Punish moving to attacked square. Huge punish if moving king, otherwise punish attacked by lower piece
+    let attacked = is_square_attacked(target, TURN ^ 1);
+    let attacked_score = 0;
+    if (attacked) {
+        if (piece_type == 5) { attacked_score = 200; }
+        if (piece_type != attacked - 1) { attacked_score = 6 - attacked; }
+    }
 
     if (get_move_capture(move)) {
-        let res = 150 + defenders[target] - (get_bit(attackers, target) ? 5 : 0);
+        let res = 150 + defenders[target] - attacked_score;
         for (let i = 0; i < 6; i++) {
             if (get_bit(BOARD[i + 6 * TURN], target)) {
                 return res + ((i % 6 - piece_type) << 1);
@@ -178,11 +200,10 @@ function score_move(move, attackers, defenders) {
     }
     if (move == killer_moves[0][ply]) { return 130; }
     if (move == killer_moves[1][ply]) { return 125; }
-    return Math.min(120, history_moves[piece][target]);
+    return Math.min(120, history_moves[piece][target]) - attacked_score;
 }
 
-function order_moves(moves) {
-    let attackers = opponent_att_mask();
+function order_moves(moves, best_move=0) {
     let defenders = new Array(64).fill(-1);
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
@@ -192,8 +213,8 @@ function order_moves(moves) {
     }
     let res = [];
     for (let i = 0; i < moves.length; i++) {
-        let entry = [score_move(moves[i], attackers, defenders), moves[i]];
-        res.push(entry);
+        let score = (moves[i] == best_move) ? 250 : score_move(moves[i], defenders);
+        res.push([score, moves[i]]);
     }
     res.sort(function(a, b) { return b[0] - a[0]; });
     for (let i = 0; i < res.length; i++) {
@@ -263,17 +284,19 @@ function best_eval_captures(depth, alpha, beta) {
 function best_eval(depth, alpha, beta) {
     pv_length[ply] = ply;
 
-    let score = HASH_TABLE.get(depth, alpha, beta);
-    if (ply && score != null) {
-        LOOKUP ++;
-        return score;
+    let best_move = 0;
+    let res = HASH_TABLE.get(depth, alpha, beta);
+    if (res[0]) { best_move = res[1]; }
+    else if (ply && res[1] != null) {
+        LOOKUP++;
+        return res[1];
     }
 
     if (depth == 0) { return best_eval_captures(8, alpha, beta); }
 
     let moves = generate_pseudo_moves();
     if (follow_pv) { enable_pv_scoring(moves); }
-    moves = order_moves(moves);
+    moves = order_moves(moves, best_move);
 
     COUNT++;
     let hash_flag = 2;
@@ -310,25 +333,28 @@ function best_eval(depth, alpha, beta) {
         TURN = copy_turn;
         hash_key = copy_hash;
 
-        if (eval >= beta) { // oppenent response too strong, snip
-            HASH_TABLE.set(depth, 3, eval);
-            if (!get_move_capture(move)) {
-                killer_moves[1][ply] = killer_moves[0][ply];
-                killer_moves[0][ply] = move;
-            }
-            return beta
-        } else if (eval > alpha) {
+        if (eval > alpha) {
+            hash_flag = 1;
             if (!get_move_capture(move)) {
                 history_moves[get_move_piece(move)][get_move_target(move)] += depth * depth;
             }
             alpha = eval;
-            hash_flag = 1;
+            best_move = move;
 
             pv_table[ply][ply] = move; // write PV move
             for (let next_ply = ply + 1; next_ply < pv_length[ply + 1]; next_ply++) { 
                 pv_table[ply][next_ply] = pv_table[ply + 1][next_ply]; 
             }
             pv_length[ply] = pv_length[ply + 1];
+
+            if (eval >= beta) { // oppenent response too strong, snip
+                HASH_TABLE.set(depth, 3, eval, best_move);
+                if (!get_move_capture(move)) {
+                    killer_moves[1][ply] = killer_moves[0][ply];
+                    killer_moves[0][ply] = move;
+                }
+                return beta
+            } 
         }
     }
     if (!legal_moves) {
@@ -337,7 +363,7 @@ function best_eval(depth, alpha, beta) {
         }
         return 0;
     }
-    HASH_TABLE.set(depth, hash_flag, alpha);
+    HASH_TABLE.set(depth, hash_flag, alpha, best_move);
     return alpha;
 }
 
@@ -367,6 +393,9 @@ function search(depth) {
 }
 
 // MAIN -----------------------------------------------------------------------------------------------------------------------------------------------
+
+let opening_phase = 6192;
+let endgame_phase = 518;
 
 let ply = 0;
 let MAX_PLY = 32;

@@ -905,9 +905,9 @@ function best_eval(depth, alpha, beta) {
     if (ply && is_repetition()) { return 0; } 
 
     let score = HASH_TABLE.get(depth, alpha, beta);
-    if (ply && score != null) {
+    if (ply && !score[0] && score[1] != null) {
         LOOKUP++;
-        return score;
+        return score[1];
     }
 
     if (depth == 0) { return best_eval_captures(alpha, beta, 8); }

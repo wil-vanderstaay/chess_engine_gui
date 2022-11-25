@@ -65,19 +65,19 @@ function create_move_san(san) {
                 bitboard = and_bitboards(COL_MASKS[target], BOARD[piece]);
             }
             break;
-        }
+        } 
         case 1: { 
             bitboard = and_bitboards(KNIGHT_ATTACK[target], BOARD[piece]); break;
-        }
+        } 
         case 2: { 
             bitboard = and_bitboards(bishop_attack_fly(target, BOARD[14]), BOARD[piece]); break;
-        }
+        } 
         case 3: { 
             bitboard = and_bitboards(rook_attack_fly(target, BOARD[14]), BOARD[piece]); break;
-        }
+        } 
         case 4: { 
             bitboard = and_bitboards(queen_attack_fly(target, BOARD[14]), BOARD[piece]); break;
-        }
+        } 
         case 5: { 
             bitboard = and_bitboards(KING_ATTACK[target], BOARD[piece]); break;
         }
@@ -479,9 +479,9 @@ class HashEntry {
 
         this.flag = 0;
         this.score = 0;
+        this.move = 0;
     }
 }
-
 class HashTable { // store score of positions previously explored at certain depth and its type 
     constructor() {
         this.hashes = {};
@@ -490,21 +490,25 @@ class HashTable { // store score of positions previously explored at certain dep
     get(depth, alpha, beta) {
         let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
         let entry = this.hashes[key];
-        if (entry != null && entry.first == hash_key[0] && entry.last == hash_key[1] && entry.depth >= depth) {
-            if (entry.flag == 1) { return entry.score; } // exact
-            if (entry.flag == 2 && entry.score <= alpha) { return alpha; } // alpha
-            if (entry.flag == 3 && entry.score >= beta) { return beta; } // beta
+        if (entry != null && entry.first == hash_key[0] && entry.last == hash_key[1]) {
+            if (entry.depth >= depth) {
+                if (entry.flag == 1) { return [0, entry.score]; } // exact
+                else if (entry.flag == 2 && entry.score <= alpha) { return [0, alpha]; } // alpha
+                else if (entry.flag == 3 && entry.score >= beta) { return [0, beta]; } // beta
+            }
+            return [1, entry.move];
         }
-        return null
+        return [0, null];
     }
 
-    set(depth, flag, score) {
+    set(depth, flag, score, move=0) {
         let entry = new HashEntry();
         entry.first = hash_key[0];
         entry.last = hash_key[1];
         entry.depth = depth;
         entry.flag = flag;
         entry.score = score;
+        entry.move = move;
 
         let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
         this.hashes[key] = entry;
