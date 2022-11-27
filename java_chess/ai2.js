@@ -184,24 +184,24 @@ function score_move(move, defenders) {
     
     // Punish moving to attacked square. Huge punish if moving king, otherwise punish attacked by lower piece
     let attacked = is_square_attacked(target, TURN ^ 1);
-    let attacked_score = 0;
+    let attacked_punish = 0;
     if (attacked) {
-        if (piece_type == 5) { attacked_score = 200; }
-        if (piece_type != attacked - 1) { attacked_score = 6 - attacked; }
+        if (piece_type == 5) { attacked_punish = 200; }
+        if (piece_type != attacked - 1) { attacked_punish = 6 - attacked; }
     }
 
     if (get_move_capture(move)) {
-        let res = 150 + defenders[target] - attacked_score;
+        let res = 150 + defenders[target] - attacked_punish;
         for (let i = 0; i < 6; i++) {
             if (get_bit(BOARD[i + 6 * TURN], target)) {
-                return res + ((i % 6 - piece_type) << 1);
+                return res + ((i - piece_type) << 1);
             }
         }
         return res; // enpassant
     }
     if (move == killer_moves[0][ply]) { return 130; }
     if (move == killer_moves[1][ply]) { return 125; }
-    return Math.min(120, history_moves[piece][target]) - attacked_score;
+    return Math.min(120, history_moves[piece][target]) - attacked_punish;
 }
 
 function order_moves(moves, best_move=0) {
@@ -209,7 +209,7 @@ function order_moves(moves, best_move=0) {
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
         if (get_move_capture(move)) {
-            defenders[get_move_target(move)] += 1 + (get_move_piece(move) % 6 ? 0 : 1);
+            defenders[get_move_target(move)] += 1 + (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
         }
     }
     let res = [];
@@ -238,15 +238,14 @@ function enable_pv_scoring(moves) {
 }
 
 // SEARCH -----------------------------------------------------------------------------------------------------------------------------------------------
-let PRINT_COUNT = 0;
 function best_eval_captures(depth, alpha, beta) {
     COUNT++;
 
     let stand_pat = evaluate_board();
     if (stand_pat >= beta) { return beta; } // beta cutoff
-    // else if (stand_pat < alpha - 900) { return alpha; } // delta pruning
+    else if (stand_pat < alpha - 900) { return alpha; } // delta pruning
     else if (stand_pat > alpha) { alpha = stand_pat; }
-    if (depth == 0) {  return stand_pat; }
+    if (depth == 0 || ply > MAX_PLY) {  return stand_pat; }
 
     let moves = generate_capture_moves();
     moves = order_moves(moves);
@@ -274,12 +273,8 @@ function best_eval_captures(depth, alpha, beta) {
         TURN ^= 1;
         hash_key = ch;
 
-        if (eval >= beta) { // oppenent response too strong, snip
-            return beta
-        }
-        if (eval > alpha) {
-            alpha = eval;
-        }
+        if (eval >= beta) { return beta; }
+        if (eval > alpha) { alpha = eval; }
     }
     return alpha;
 }
@@ -296,6 +291,7 @@ function best_eval(depth, alpha, beta) {
     }
 
     if (depth == 0) { return best_eval_captures(8, alpha, beta); }
+    else if (ply >= MAX_PLY) { return evaluate_board(); }
 
     let moves = generate_pseudo_moves();
     if (follow_pv) { enable_pv_scoring(moves); }

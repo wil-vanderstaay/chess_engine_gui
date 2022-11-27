@@ -267,15 +267,15 @@ int create_move(int source, int target, int piece, int promote=0, int capture=0,
     1000    black queen
 */
 
-#define get_castle_pk() (CASTLE & 1)
-#define get_castle_pq() ((CASTLE & 2) >> 1)
-#define get_castle_ak() ((CASTLE & 4) >> 2)
-#define get_castle_aq() ((CASTLE & 8) >> 3)
+#define get_castle_wk() (CASTLE & 1)
+#define get_castle_wq() ((CASTLE & 2) >> 1)
+#define get_castle_bk() ((CASTLE & 4) >> 2)
+#define get_castle_bq() ((CASTLE & 8) >> 3)
 void print_castle() {
-    if (get_castle_pk()) { printf("K"); }
-    if (get_castle_pq()) { printf("Q"); }
-    if (get_castle_ak()) { printf("k"); }
-    if (get_castle_aq()) { printf("q"); }
+    if (get_castle_wk()) { printf("K"); }
+    if (get_castle_wq()) { printf("Q"); }
+    if (get_castle_bk()) { printf("k"); }
+    if (get_castle_bq()) { printf("q"); }
     if (!CASTLE) { printf("-"); }
     printf("\n");
 }
@@ -354,58 +354,53 @@ void reset_board() {
     ENPASSANT = enpassant_copy;     \
     CASTLE = castle_copy;           \
     HASH = hash_copy; 
-
+    
 void create_board(string fen) {
-    int pos = 0;
-    for (int i = 0; i < fen.length(); i++) {
-        char c = fen[i];
-        if (c == ' ') {
-            BOARD[12] = 0ULL;
-            BOARD[13] = 0ULL;
-            for (int b = 0; b < 6; b++) {
-                BOARD[12] |= BOARD[b]; // player
-                BOARD[13] |= BOARD[b + 6]; // ai
-            }
-            BOARD[14] = BOARD[12] | BOARD[13]; // board
-            int j = 3;
-            while (fen[i + j] != ' ') {
-                if (fen[i + j] == 'K') {
-                    CASTLE |= 1;
-                } else if (fen[i + j] == 'Q') {
-                    CASTLE |= 2;
-                } else if (fen[i + j] == 'k') {
-                    CASTLE |= 4;
-                } else if (fen[i + j] == 'q') {
-                    CASTLE |= 8;
-                }
-                j++;
-            }
-            if (fen[i + j + 1] != '-') {
-                ENPASSANT = ((8 - (int) fen[i + j + 2]) << 3) + (int) fen[i + j + 1] - 97;
-            }
-            initialise_hash();
-            return;
-        } else if (c == '/') {
+    reset_board();
+
+    int row = 0;
+    int col = 0;
+    int i = 0;
+    char c;
+    while (fen[i] != ' ') {
+        c = fen[i];
+        if (c == '/') {
+            row++;
+            col = 0;
         } else if (isdigit(c)) {
-            pos += c - 48;
+            col += c - 49;
         } else {
-            int char_value = 0;
-            if (c == 'N') { char_value = 1; }
-            else if (c == 'B') { char_value = 2; }
-            else if (c == 'R') { char_value = 3; }
-            else if (c == 'Q') { char_value = 4; }
-            else if (c == 'K') { char_value = 5; }
-            else if (c == 'p') { char_value = 6; }
-            else if (c == 'n') { char_value = 7; }
-            else if (c == 'b') { char_value = 8; }
-            else if (c == 'r') { char_value = 9; }
-            else if (c == 'q') { char_value = 10; }
-            else if (c == 'k') { char_value = 11; }
-            set_bit(BOARD[char_value], pos);
-            pos++;
+            set_bit(BOARD[PIECES.find(c)], (row << 3) + col);
+            col++;
         }
+        i++;
     }
+    for (int b = 0; b < 6; b++) {
+        BOARD[12] |= BOARD[b]; // white
+        BOARD[13] |= BOARD[b + 6]; // black
+    }
+    BOARD[14] = BOARD[12] | BOARD[13]; // board
+
+    TURN = fen[i + 1] == 'w' ? 0 : 1;
+    int j = 3;
+    while (fen[i + j] != ' ') {
+        if (fen[i + j] == 'K') {
+            CASTLE |= 1;
+        } else if (fen[i + j] == 'Q') {
+            CASTLE |= 2;
+        } else if (fen[i + j] == 'k') {
+            CASTLE |= 4;
+        } else if (fen[i + j] == 'q') {
+            CASTLE |= 8;
+        }
+        j++;
+    }
+    if (fen[i + j + 1] != '-') {
+        ENPASSANT = ((8 - (int) fen[i + j + 2]) << 3) + (int) fen[i + j + 1] - 97;
+    }
+    initialise_hash();
 }
+
 void print_board() {
     for (int i = 0; i < 8; i++) {
         for (int j = 0; j < 8; j++) {
@@ -471,70 +466,89 @@ void initialise_move_constants() {
 
 U64 bishop_attack_fly(int square, U64 blocker) {
     U64 b = 0ULL;
-    int row = square >> 3;
-    int col = square % 8;
-    int r, c, i;
-    for (r = row + 1, c = col + 1; r < 8 && c < 8; r++, c++) {
-        i = (r << 3) + c;
+    int r = square >> 3;
+    int c = square % 8;
+    int i;
+    int o = 1;
+    while (r + o < 8 && c + o < 8) { // + +
+        i = square + 9 * o;
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
-    for (r = row + 1, c = col - 1; r < 8 && 0 <= c; r++, c--) {
-        i = (r << 3) + c;
+    o = 1;
+    while (r + o < 8 && 0 <= c - o) { // + -
+        i = square + 7 * o;
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
-    for (r = row - 1, c = col + 1; 0 <= r && c < 8; r--, c++) {
-        i = (r << 3) + c;
+    o = 1;
+    while (0 <= r - o && c + o < 8) { // - +
+        i = square - 7 * o;
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
-    for (r = row - 1, c = col - 1; 0 <= r && 0 <= c; r--, c--) {
-        i = (r << 3) + c;
+    o = 1;
+    while (0 <= r - o && 0 <= c - o) { // - -
+        i = square - 9 * o;
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
     return b;
 }
+
 U64 rook_attack_fly(int square, U64 blocker) {
     U64 b = 0ULL;
-    int row = square >> 3;
-    int col = square % 8;
-    int r, c, i;
-    for (r = row + 1; r < 8; r++) {
-        i = (r << 3) + col;
+    int r = square >> 3;
+    int c = square % 8;
+    int i;
+    int o = 1;
+    while (r + o < 8) { // +.
+        i = square + (o << 3);
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
-    for (r = row - 1; 0 <= r; r--) {
-        i = (r << 3) + col;
+    o = 1;
+    while (0 <= r - o) { // -.
+        i = square - (o << 3);
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
-    for (c = col + 1; c < 8; c++) {
-        i = (row << 3) + c;
+    o = 1;
+    while (c + o < 8) { // .+
+        i = square + o;
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
-    for (c = col - 1; 0 <= c; c--) {
-        i = (row << 3) + c;
+    o = 1;
+    while (0 <= c - o) { // .-
+        i = square - o;
         set_bit(b, i);
         if (get_bit(blocker, i)) { break; }
+        o++;
     }
     return b;
 }
+
 U64 queen_attack_fly(int square, U64 blocker) {
     return bishop_attack_fly(square, blocker) | rook_attack_fly(square, blocker);
 }
 
 int is_square_attacked(int square, int side) {
+    int att = side * 6;
     if (!side && (PAWN_ATTACK[1][square] & BOARD[0])) { return 1; }
     if (side && (PAWN_ATTACK[0][square] & BOARD[6])) { return 1; }
-    if (KNIGHT_ATTACK[square] & (side ? BOARD[7] : BOARD[1])) { return 2; }
-    if (bishop_attack_fly(square, BOARD[14]) & (side ? BOARD[8] : BOARD[2])) { return 3; }
-    if (rook_attack_fly(square, BOARD[14]) & (side ? BOARD[9] : BOARD[3])) { return 4; }
-    if (queen_attack_fly(square, BOARD[14]) & (side ? BOARD[10] : BOARD[4])) { return 5; }
-    if (KING_ATTACK[square] & (side ? BOARD[11] : BOARD[5])) { return 6; }
+    if (KNIGHT_ATTACK[square] & BOARD[att + 1]) { return 2; }
+    if (bishop_attack_fly(square, BOARD[14]) & BOARD[att + 2]) { return 3; }
+    if (rook_attack_fly(square, BOARD[14]) & BOARD[att + 3]) { return 4; }
+    if (queen_attack_fly(square, BOARD[14]) & BOARD[att + 4]) { return 5; }
+    if (KING_ATTACK[square] & BOARD[att + 5]) { return 6; }
     return 0;
 }
 
@@ -577,27 +591,14 @@ int do_move(int move, int capture_only=0) {
             HASH ^= ZOB_SQUARE[target + 8][6];
         }
     } else if (get_move_castle(move)) {
-        if (target == 62) {
-            pop_bit(BOARD[3], 63);
-            set_bit(BOARD[3], 61);
-            HASH ^= ZOB_SQUARE[63][3];
-            HASH ^= ZOB_SQUARE[61][3];
-        } else if (target == 58) {
-            pop_bit(BOARD[3], 56);
-            set_bit(BOARD[3], 59);
-            HASH ^= ZOB_SQUARE[56][3];
-            HASH ^= ZOB_SQUARE[59][3];
-        } else if (target == 6) {
-            pop_bit(BOARD[9], 7);
-            set_bit(BOARD[9], 5);
-            HASH ^= ZOB_SQUARE[7][9];
-            HASH ^= ZOB_SQUARE[5][9];
-        } else if (target == 2) {
-            pop_bit(BOARD[9], 0);
-            set_bit(BOARD[9], 3);
-            HASH ^= ZOB_SQUARE[0][9];
-            HASH ^= ZOB_SQUARE[3][9];
-        }
+        int kingside = (target == 62) || (target == 6);
+        int rook_source = (kingside) ? target + 1 : target - 2;
+        int rook_target = (kingside) ? target - 1 : target + 1;
+
+        pop_bit(BOARD[piece - 2], rook_source);
+        set_bit(BOARD[piece - 2], rook_target);
+        HASH ^= ZOB_SQUARE[rook_source][piece - 2];
+        HASH ^= ZOB_SQUARE[rook_target][piece - 2];
     }
     if (ENPASSANT) {
         HASH ^= ZOB_ENPASSANT[ENPASSANT];
@@ -609,7 +610,7 @@ int do_move(int move, int capture_only=0) {
         } else {
             ENPASSANT = target + 8;
         }
-            HASH ^= ZOB_ENPASSANT[ENPASSANT];
+        HASH ^= ZOB_ENPASSANT[ENPASSANT];
     }
     HASH ^= ZOB_CASTLE[CASTLE];
     CASTLE &= CASTLING_RIGHTS[source];
@@ -657,17 +658,17 @@ static inline void generate_moves(moves* move_list) {
         // Push
         if (!get_bit(BOARD[14], target)) {
             if (target < 8 || 56 <= target) { // promotion
-                add_move(move_list, create_move(source, target, piece, piece + 1)); // rook
-                add_move(move_list, create_move(source, target, piece, piece + 2)); // knight
-                add_move(move_list, create_move(source, target, piece, piece + 3)); // bishop
+                add_move(move_list, create_move(source, target, piece, piece + 1)); // knight
+                add_move(move_list, create_move(source, target, piece, piece + 2)); // bishop
+                add_move(move_list, create_move(source, target, piece, piece + 3)); // rook
                 add_move(move_list, create_move(source, target, piece, piece + 4)); // queen
             } else {
                 // One square push
                 add_move(move_list, create_move(source, target, piece));
                 // Two square push
-                int dtarget = target + target - source;
-                if (source >> 3 == (TURN ? 1 : 6) && !get_bit(BOARD[14], dtarget)) {
-                    add_move(move_list, create_move(source, dtarget, piece, 0, 0, 1));
+                att = (target << 1) - source;
+                if (source >> 3 == (TURN ? 1 : 6) && !get_bit(BOARD[14], att)) {
+                    add_move(move_list, create_move(source, att, piece, 0, 0, 1));
                 }
             }
         }
@@ -768,14 +769,14 @@ static inline void generate_moves(moves* move_list) {
     // Castling
     if (CASTLE) {
         int kp = TURN ? 4 : 60;
-        if ((!TURN && get_castle_pk()) || (TURN && get_castle_ak())) {
+        if (get_castle_wk() || get_castle_bk()) {
             if (!get_bit(BOARD[14], kp + 1) && !get_bit(BOARD[14], kp + 2)) {
                 if (!is_square_attacked(kp, TURN ^ 1) && !is_square_attacked(kp + 1, TURN ^ 1)) {
                     add_move(move_list, create_move(kp, kp + 2, piece, 0, 0, 0, 0, 1));
                 }
             }
         }
-        if ((!TURN && get_castle_pq()) || (TURN && get_castle_aq())) {
+        if (get_castle_wq() || get_castle_bq()) {
             if (!get_bit(BOARD[14], kp - 1) && !get_bit(BOARD[14], kp - 2) && !get_bit(BOARD[14], kp - 3)) {
                 if (!is_square_attacked(kp, TURN ^ 1) && !is_square_attacked(kp - 1, TURN ^ 1)) {
                     add_move(move_list, create_move(kp, kp - 2, piece, 0, 0, 0, 0, 1));
@@ -786,26 +787,17 @@ static inline void generate_moves(moves* move_list) {
 }
 
 string get_move_desc(int move) {
-    int move_source = get_move_source(move);
-    int move_target = get_move_target(move);
-    int move_piece = get_move_piece(move);
+    int source = get_move_source(move);
+    int target = get_move_target(move);
+    int piece = get_move_piece(move);
+    int promote = get_move_promote(move);
+    int capture = get_move_capture(move);
 
-    // Check castle moves
-    if (get_move_castle(move)) {
-        if (move_source < move_target) {
-            return "O-O";
-        }
-        return "O-O-O";
-    }
-
-    string letters = "abcdefgh";
-    int srow = move_source >> 3; int scol = move_source % 8;
-    int trow = 7 - (move_target >> 3); int tcol = move_target % 8;
-
+    if (get_move_castle(move)) { return (source < target) ? "O-O" : "O-O-O"; }  
+    
     string res;
-    if (move_piece % 6) { 
-        res = PIECES[move_piece % 6]; 
-    }
+    if (piece % 6) { res.push_back(PIECES[piece % 6]); }
+    else if (capture) { res.push_back((char) (source % 8 + 97)); }
 
     // Disambiguate moves for pgn eg. Nge2
     moves move_list[1];
@@ -813,32 +805,26 @@ string get_move_desc(int move) {
     for (int i = 0; i < move_list -> count; i++) {
         // Not this move, same piece not pawn, same target square
         int other_move = move_list -> moves[i];
-        if (move != other_move && move_piece == get_move_piece(other_move) && move_piece % 6 != 0 && move_target == get_move_target(other_move)) {
-            if (scol == get_move_source(other_move) % 8) { // use numbers
-                res.append(to_string(8 - srow));
-            } else { // use letters
-                res.push_back(letters[scol]);
-            }
+        if (move != other_move && piece % 6 && piece == get_move_piece(other_move) && target == get_move_target(other_move)) {
+            int other_source = get_move_source(other_move);
+            if ((other_source % 8) == (source % 8)) { res.push_back((char) (57 - (source >> 3))); }
+            else { res.push_back((char) (source % 8 + 97)); }
+            break;
         }
     }
-
-    // Check capture moves
-    if (get_move_capture(move)) { 
-        if (!res.length()) { res.push_back(letters[scol]); } // pawn capture
-        res.push_back('x');
-    }
-    res.push_back(letters[tcol]); // move notation
-    res.append(to_string(trow + 1));
-
-    // Check promotion moves
-    int move_promote = get_move_promote(move);
-    if (move_promote) { 
+    if (capture) { res += 'x'; }
+    res.push_back((char) (target % 8 + 97));
+    res.push_back((char) (56 - (target >> 3)));
+    if (promote) {
         res.push_back('=');
-        if (!PIECES[move_promote]) {
-            res.push_back('Q'); 
-        } else {
-            res.push_back(PIECES[move_promote]); 
-        }
+        if (promote == 15) {
+            for (int i = 0; i < 12; i++) {
+                if (get_bit(BOARD[i], target)) {
+                    if (i % 6) { res.push_back(PIECES[i % 6]); }
+                    break;
+                }
+            }
+        } else { res.push_back(PIECES[promote % 6]); }
     }
     return res;
 }
@@ -912,13 +898,6 @@ int gamephase_score() {
     }
     return res;
 }
-int piece_value_map(int piece, int square, int phase) {
-    if (piece >= 6) {
-        piece -= 6;
-        square += (7 - (square >> 3 << 1)) << 3; // flip rows. Maps from player perspective
-    }   
-    return piece_score[phase][piece] + positional_score[phase][piece][square];
-}
 
 int evaluate_board() {
     int opening = 0;
@@ -928,14 +907,15 @@ int evaluate_board() {
         b = BOARD[i];
         while (b) {
             int square = pop_lsb_index(b);
-            opening += piece_value_map(i, square, 0);
-            endgame += piece_value_map(i, square, 1);
+            opening += piece_score[0][i] + positional_score[0][i][square];
+            endgame += piece_score[1][i] + positional_score[1][i][square];
         }
         b = BOARD[i + 6];
         while (b) {
             int square = pop_lsb_index(b);
-            opening -= piece_value_map(i + 6, square, 0);
-            endgame -= piece_value_map(i + 6, square, 1);
+            square += (7 - (square >> 3 << 1)) << 3; // flip rows. Maps from player perspective
+            opening -= piece_score[0][i] + positional_score[0][i][square];
+            endgame -= piece_score[1][i] + positional_score[1][i][square];
         }
     }
     int score = gamephase_score();
@@ -958,37 +938,47 @@ void enable_pv_scoring(moves* move_list) {
     }
 }
 
-static inline int score_move(int move, int attackers[64]) {
+static inline int score_move(int move, int defenders[64]) {
     if (score_pv && move == PV_TABLE[0][ply]) {
         score_pv = 0;
-        return 20000; // best move from previous search
+        return 200; // best move from previous search
     }
     int target = get_move_target(move);
     int piece = get_move_piece(move);
     int piece_type = piece % 6;
+
+    // Punish moving to attacked square. Huge punish if moving king, otherwise punish attacked by lower piece
+    int attacked = is_square_attacked(target, TURN ^ 1);
+    int attacked_punish = 0;
+    if (attacked) {
+        if (piece_type == 5) { attacked_punish = 200; }
+        if (piece_type != attacked - 1) { attacked_punish = 6 - attacked; }
+    }
+
     if (get_move_capture(move)) {
-        for (int i = 6 * (TURN ^ 1); i < 6 * (TURN ^ 1) + 6; i++) {
-            if (get_bit(BOARD[i], target)) {
-                // minus attacker, plus captured piece, plus if multiple attackers
-                return 10050 - 10 * piece_type + 100 * (i % 6 + 1) + (attackers[target] > 1);
+        int res = 150 + defenders[target] - attacked_punish;
+        for (int i = 0; i < 6; i++) {
+            if (get_bit(BOARD[i + 6 * TURN], target)) {
+                return res + ((i - piece_type) << 1);
             }
         }
-        return 10105; // enpassant score
+        return res; // enpassant
     }
-    if (move == KILLER_MOVES[0][ply]) { return 9000; }
-    if (move == KILLER_MOVES[1][ply]) { return 8000; }
-    return min(7000, HISTORY_MOVES[piece][target]);
+    if (move == KILLER_MOVES[0][ply]) { return 130; }
+    if (move == KILLER_MOVES[1][ply]) { return 125; }
+    return min(120, HISTORY_MOVES[piece][target]) - attacked_punish;
 }
 static inline void order_moves(moves* move_list) {
-    int attackers[64] = {};
+    int defenders[64] = {};
     for (int i = 0; i < move_list -> count; i++) {
-        if (get_move_capture(move_list -> moves[i])) {
-            attackers[get_move_target(move_list -> moves[i])]++;
+        int move = move_list -> moves[i];
+        if (get_move_capture(move)) {
+            defenders[get_move_target(move)]++;
         }
     }
     int scores[move_list -> count];
     for (int i = 0; i < move_list -> count; i++) {
-        scores[i] = score_move(move_list -> moves[i], attackers);
+        scores[i] = score_move(move_list -> moves[i], defenders);
     }
     for (int i = 0; i < move_list -> count; i++) {
         for (int j = i + 1; j < move_list -> count; j++) {
@@ -1035,11 +1025,12 @@ int is_repitition() {
 
 int best_eval_captures(int depth, int alpha, int beta) {
     NODES++;
+
     int eval = evaluate_board();
-    if (depth == 0 || ply >= MAX_PLY) { return eval; }
-    else if (eval >= beta) { return beta; }
-    else if (eval < alpha - 900) { return alpha; }
+    if (eval >= beta) { return beta; } // beta cutoff
+    else if (eval < alpha - 900) { return alpha; } // delta pruning
     else if (eval > alpha) { alpha = eval; }
+    if (depth == 0 || ply >= MAX_PLY) { return eval; }
 
     moves move_list[1];
     generate_moves(move_list);
@@ -1115,8 +1106,9 @@ int best_eval(int depth, int alpha, int beta) {
     }
 
     if (!legal_moves) {
-        int king = lsb_index(BOARD[6 * TURN + 5]);
-        if (is_square_attacked(king, TURN ^ 1)) { return -mate_value + ply; }
+        if (is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) { 
+            return -mate_value + ply; 
+        }
         return 0;
     }
     write_hash(alpha, depth, flag);
@@ -1202,11 +1194,12 @@ int main(int argc, char *argv[]) {
     initialise();
 
     // play_game(start_position, 50, 6);
+    // return 0;
 
     create_board(start_position);
     print_board();
 
-    search(9);
+    search(8);
 
     return 0;
 }

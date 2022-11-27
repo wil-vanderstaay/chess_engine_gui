@@ -131,7 +131,7 @@ function get_move_san(move, moves=[]) {
             }
         }
     }
-    if (get_move_capture(move)) { res += "x"; }
+    if (capture) { res += "x"; }
     res += square_name(target);
     if (promote) { 
         res += "=";
@@ -753,9 +753,8 @@ function generate_pseudo_moves() {
         let target = source + pawn_direction;
 
         // Push
-        if (0 <= target && target < 64 && !get_bit(BOARD[14], target)) {
-            let trow = target >> 3;
-            if (trow == 0 || trow == 7) { // promotion
+        if (!get_bit(BOARD[14], target)) {
+            if (target < 8 || 56 <= target) { // promotion
                 moves.push(create_move(source, target, piece, piece + 1)); // knight
                 moves.push(create_move(source, target, piece, piece + 2)); // bishop
                 moves.push(create_move(source, target, piece, piece + 3)); // rook
@@ -1196,6 +1195,11 @@ function make_board(fen) {
     let res = new Array(64).fill(0);
     let split_fen = fen.split(" ");
 
+    if (split_fen.length > 6 || 
+        split_fen.length < 4 || 
+        split_fen[0].split("/").length != 8 ||
+        (!split_fen[1].includes("w") && !split_fen[1].inclues("b"))) { return []; }
+
     let pieces = "PNBRQKpnbrqk";
     let row = 0;
     let col = 0;
@@ -1530,7 +1534,7 @@ function doAiMove() {
     return true;
 }
 
-function upload_game() {
+function import_fen() {
     let fen = prompt("Enter fen:");
     if (fen) {
         let test_board = make_board(fen);
@@ -1538,7 +1542,7 @@ function upload_game() {
             alert("Invalid fen");
             return;
         }
-        start_game(true, fen);
+        start_game(!TURN, fen);
     }
 }
 
@@ -1707,7 +1711,7 @@ let GAME_MOVES;
 initialise_constants();
 
 let tricky_fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
-start_game(true, tricky_fen);
+start_game(true);
 
 /*
     AI (WHITE) vs AI2 (BLACK)  ->  AI2 has no endgame evaluation
