@@ -28,7 +28,8 @@ function create_move_uci(uci) {
         }
     }
     let letters = " nbrq";
-    let promote = letters.indexOf(uci.length == 5 ? uci[4] : " "); // TODO: make correct colour
+    let promote = 0;
+    if (uci.length == 5) { promote = letters.indexOf(uci[4]) + 6 * TURN; }
     let double = !(piece % 6) && Math.abs((source >> 3) - (target >> 3)) == 2;
     let enpassant = !(piece % 6) && Math.abs((source % 8) - (target % 8)) == 1 && !get_bit(BOARD[14], target);
     let capture = (enpassant || get_bit(BOARD[14], target)) ? 1 : 0;
@@ -1077,42 +1078,17 @@ function copy_to_clipboard(text) {
 }
 
 function open_chess_com() {
-    if (document.getElementById("stored_fen").value == START_FEN) {
-        open("https://www.chess.com/analysis?pgn=" + get_game_moves().replaceAll(" ", "%20"));
-    } else {
-        open("https://www.chess.com/analysis?fen=" + get_fen().replaceAll(" ", "%20"));
-    }
+    open("https://www.chess.com/analysis?pgn=" + get_pgn());
 }
 function open_lichess() {
-    import_pgn(get_pgn());
+    open("https://www.lichess.org/paste?pgn=" + get_pgn());
 }
 
 function get_pgn() {
-    let res = `[Event "?"]
-    [Site "?"]
-    [Date "????.??.??"]
-    [Round "?"]
-    [White "`;
-    if (PLAYER_WHITE) {
-        res += `WillyWonka"]
-        [Black "Computer`;
-    } else {
-        res += `Computer"]
-        [Black "WillyWonka`;
-    }
-    res += `"]
-    [Result "*"]
-    `
+    let res = '[Event "?"][Site "?"][Date "????.??.??"][Round "?"][White "' + (PLAYER_WHITE ? 'WillyWonka"][Black "Computer' : 'Computer"][Black "WillyWonka') + '"][Result "*"]';
     let from_fen = document.getElementById("stored_fen").value;
-    if (from_fen != START_FEN) {
-        res += `[FEN "` + from_fen + `"]`
-    }
-
-    res += `
-    
-    ` + get_game_moves() + "*";
-    copy_to_clipboard(res);
-    return res;
+    if (from_fen != START_FEN) { res += '[FEN "' + from_fen + '"]'; }
+    return res + get_game_moves() + '*';
 }
 
 function get_fen() {
@@ -1198,7 +1174,7 @@ function make_board(fen) {
     if (split_fen.length > 6 || 
         split_fen.length < 4 || 
         split_fen[0].split("/").length != 8 ||
-        (!split_fen[1].includes("w") && !split_fen[1].inclues("b"))) { return []; }
+        (!split_fen[1].includes("w") && !split_fen[1].includes("b"))) { return []; }
 
     let pieces = "PNBRQKpnbrqk";
     let row = 0;
@@ -1675,11 +1651,6 @@ function start_game(whiteDown, fen=START_FEN, lookahead=6) {
     document.getElementById("stored_fen").value = fen;
 
     prepare_game(whiteDown, fen, lookahead);
-
-    if (fen == "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0") {
-        GAME_MOVES = ["e4","e5","Qh5","Qh4","Qxh7","Qxh2","Qxh8","Qxh1","Qxg8","Qxg1","Qxg7","Qxg2","Qxf7+","Kd8","Qd5","Qxf2+","Kd1","Ke8","Qxb7","Kf7","Bg2","Qxg2","Qxa8","Kg8","Qxb8","Qxe4","Qxc8","Qxc2+","Ke1","Qxd2+","Kf1","Qxb2","Kg1","Qxa1","Qxc7","Qxa2","Qxe5","Bd6","Qxd6","Qf7","Qxd7","Qh7","Qxa7","Qf7","Qxf7+","Kxf7","Bd2","Kg8","Be1","Kf7","Nd2","Kf8","Nf1","Kg8"];
-        document.getElementById("stored_fen").value = START_FEN;
-    }
 
     if (!(TURN ^ PLAYER_WHITE)) {
         doAiMove();

@@ -248,6 +248,24 @@ void print_binary(U64 bitboard) {
 int create_move(int source, int target, int piece, int promote=0, int capture=0, int two=0, int enpassant=0, int castle=0) {
     return (source) | (target << 6) | (piece << 12) | (promote << 16) | (capture << 20) | (two << 21) | (enpassant << 22) | (castle << 23);
 }
+int create_move(string uci) {
+    int source = 351 - ((int) uci[1] << 3) + (int) uci[0];
+    int target = 351 - ((int) uci[3] << 3) + (int) uci[2];
+    int piece = 0;
+    for (int i = 0; i < 12; i++) {
+        if (get_bit(BOARD[i], source)) {
+            piece = i;
+            break;
+        }
+    }
+    int promote = (uci.length() == 5) ? PIECES.find(uci[4]) + 6 * (TURN - 1) : 0;
+    int two = (!(piece % 6) && abs((source >> 3) - (target >> 3)) == 2) ? 1 : 0;
+    int enpassant = (!(piece % 6) && abs((source % 8) - (target % 8)) == 1 && !get_bit(BOARD[14], target)) ? 1 : 0;
+    int capture = (enpassant || get_bit(BOARD[14], target)) ? 1 : 0;
+    int castle = (piece % 6 == 5 && abs((source % 8) - (target % 8)) == 2) ? 1 : 0;
+    printf("%d %d %d %d %d %d %d %d\n", source, target, piece, promote, capture, two, enpassant, castle);
+    return create_move(source, target, piece, promote, capture, two, enpassant, castle);
+}
 #define get_move_source(move) (move & 63)
 #define get_move_target(move) ((move & 4032) >> 6)
 #define get_move_piece(move) ((move & 61440) >> 12)
@@ -368,7 +386,7 @@ void create_board(string fen) {
             row++;
             col = 0;
         } else if (isdigit(c)) {
-            col += c - 49;
+            col += c - 48;
         } else {
             set_bit(BOARD[PIECES.find(c)], (row << 3) + col);
             col++;
@@ -952,7 +970,7 @@ static inline int score_move(int move, int defenders[64]) {
     int attacked_punish = 0;
     if (attacked) {
         if (piece_type == 5) { attacked_punish = 200; }
-        if (piece_type != attacked - 1) { attacked_punish = 6 - attacked; }
+        else if (piece_type != attacked - 1) { attacked_punish = 6 - attacked; }
     }
 
     if (get_move_capture(move)) {
@@ -973,13 +991,13 @@ static inline void order_moves(moves* move_list) {
     for (int i = 0; i < move_list -> count; i++) {
         int move = move_list -> moves[i];
         if (get_move_capture(move)) {
-            defenders[get_move_target(move)]++;
+            defenders[get_move_target(move)] += 2 - (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
         }
     }
     int scores[move_list -> count];
     for (int i = 0; i < move_list -> count; i++) {
         scores[i] = score_move(move_list -> moves[i], defenders);
-    }
+    }    
     for (int i = 0; i < move_list -> count; i++) {
         for (int j = i + 1; j < move_list -> count; j++) {
             if (scores[i] < scores[j]) {
@@ -1126,33 +1144,52 @@ int search(int depth) {
     for (int current_depth = 1; current_depth <= depth; current_depth++) {
         follow_pv = 1;
         eval = best_eval(current_depth, -infinity, infinity);
- 
+        if (TURN) { eval *= -1; }
+
         printf("Depth: %i, analysed: %i, eval: %i, PV: ", current_depth, NODES, eval);
         for (int i = 0; i < PV_LENGTH[0]; i++) {
             printf("%s ", get_move_desc(PV_TABLE[0][i]).c_str());
         }
         printf("\n");
+        if (abs(eval) > mate_score) { break; }
     } 
     printf("Best move: %s, eval: %d\n\n", get_move_desc(PV_TABLE[0][0]).c_str(), eval);
     return eval;
 }
 
-void play_game(string start_fen, int total_ply, int depth) {
+void play_game(string start_fen) {
     create_board(start_fen);
-    print_board();
 
     string pgn = "";
-    for (int i = 0; i < total_ply; i++) {
-        search(depth);
+    int move;
+    for (int i = 0; i < 100; i++) {
+        pgn.append(to_string(i + 1)); 
+        pgn.append(". "); 
 
-        if (i % 2 == 0) { pgn.append(to_string(i / 2 + 1)); pgn.append(". "); }
-        pgn.append(get_move_desc(PV_TABLE[0][0]));
+        print_board();
+
+        int depth;
+        cout << "Set AI depth: ";
+        cin >> depth;
+
+        // Human move
+        string uci;
+        cout << "Enter move uci: ";
+        cin >> uci;
+        move = create_move(uci);
+        if (!do_move(move)) { printf("Invalid uci\n"); break; }
+        pgn.append(get_move_desc(move));
         pgn.append(" ");
 
-        do_move(PV_TABLE[0][0]);
-        print_board();
+        // Ai move
+        search(depth);
+        move = PV_TABLE[0][0];
+        if (!do_move(move)) { printf("Invalid AI move\n"); break; }
+        pgn.append(get_move_desc(move));
+        pgn.append(" ");
     }
     printf("%s\n", pgn.c_str());
+    print_board();
 }
 
 // ------------------------------ PERF TEST ------------------------------
@@ -1193,7 +1230,7 @@ int main(int argc, char *argv[]) {
 
     initialise();
 
-    // play_game(start_position, 50, 6);
+    // play_game(start_position);
     // return 0;
 
     create_board(start_position);
