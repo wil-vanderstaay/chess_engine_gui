@@ -898,7 +898,7 @@ function search(search_time=1500) {
     if (move) {
         console.log("Book");
         pv_table[0][0] = move;
-        return [0, 0];
+        return 0;
     } 
 
     let eval;
@@ -921,7 +921,7 @@ function search(search_time=1500) {
     let time = Math.round(performance.now() - start);
     console.log("Best move: " + (get_move_san(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (time));
     console.log(" ");
-    return [eval, time];
+    return eval;
 }
 
 // MAIN -----------------------------------------------------------------------------------------------------------------------------------------------

@@ -1433,10 +1433,9 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
 }
 
 function doAiMove() {
-    let res = search();
-    let evaluation = res[0]; 
-
+    let evaluation = search(); 
     let best_move = pv_table[0][0];
+    
     let san = get_move_san(best_move);
     if (!do_move(best_move)) {
         finish();
