@@ -191,6 +191,7 @@ U64 repititions[1000]; // 500 moves
 int repitition_index;
 
 int NODES;
+int LOOKUP;
 
 // ------------------------------ BITBOARD ------------------------------
 
@@ -263,7 +264,6 @@ int create_move(string uci) {
     int enpassant = (!(piece % 6) && abs((source % 8) - (target % 8)) == 1 && !get_bit(BOARD[14], target)) ? 1 : 0;
     int capture = (enpassant || get_bit(BOARD[14], target)) ? 1 : 0;
     int castle = (piece % 6 == 5 && abs((source % 8) - (target % 8)) == 2) ? 1 : 0;
-    printf("%d %d %d %d %d %d %d %d\n", source, target, piece, promote, capture, two, enpassant, castle);
     return create_move(source, target, piece, promote, capture, two, enpassant, castle);
 }
 #define get_move_source(move) (move & 63)
@@ -420,7 +420,9 @@ void create_board(string fen) {
 }
 
 void print_board() {
+    printf("\n");
     for (int i = 0; i < 8; i++) {
+        printf("%d   ", 8 - i);
         for (int j = 0; j < 8; j++) {
             int k = (i << 3) + j;
             if (get_bit(BOARD[14], k)) {
@@ -436,6 +438,7 @@ void print_board() {
         printf("\n");
     }
     printf("\n");
+    printf("    a b c d e f g h\n\n");
 }
 
 // ------------------------------ GENERATE MOVES ------------------------------
@@ -787,14 +790,14 @@ static inline void generate_moves(moves* move_list) {
     // Castling
     if (CASTLE) {
         int kp = TURN ? 4 : 60;
-        if (get_castle_wk() || get_castle_bk()) {
+        if (TURN ? get_castle_bk() : get_castle_wk()) {
             if (!get_bit(BOARD[14], kp + 1) && !get_bit(BOARD[14], kp + 2)) {
                 if (!is_square_attacked(kp, TURN ^ 1) && !is_square_attacked(kp + 1, TURN ^ 1)) {
                     add_move(move_list, create_move(kp, kp + 2, piece, 0, 0, 0, 0, 1));
                 }
             }
         }
-        if (get_castle_wq() || get_castle_bq()) {
+        if (TURN ? get_castle_bq() : get_castle_wq()) {
             if (!get_bit(BOARD[14], kp - 1) && !get_bit(BOARD[14], kp - 2) && !get_bit(BOARD[14], kp - 3)) {
                 if (!is_square_attacked(kp, TURN ^ 1) && !is_square_attacked(kp - 1, TURN ^ 1)) {
                     add_move(move_list, create_move(kp, kp - 2, piece, 0, 0, 0, 0, 1));
@@ -956,47 +959,59 @@ void enable_pv_scoring(moves* move_list) {
     }
 }
 
-static inline int score_move(int move, int defenders[64]) {
+static inline int score_move(int move, int defenders, int max_history) {
     if (score_pv && move == PV_TABLE[0][ply]) {
         score_pv = 0;
-        return 200; // best move from previous search
+        return 150; // best move from previous search
     }
+    int res = 0;
     int target = get_move_target(move);
-    int piece = get_move_piece(move);
-    int piece_type = piece % 6;
+    int piece = get_move_piece(move) % 6;
 
-    // Punish moving to attacked square. Huge punish if moving king, otherwise punish attacked by lower piece
-    int attacked = is_square_attacked(target, TURN ^ 1);
-    int attacked_punish = 0;
-    if (attacked) {
-        if (piece_type == 5) { attacked_punish = 200; }
-        else if (piece_type != attacked - 1) { attacked_punish = 6 - attacked; }
+    int att_piece = is_square_attacked(target, TURN ^ 1);
+    if (att_piece) {
+        if (piece == 5) { return -250; }
+
+        if (!defenders && piece) { // piece sacrifice
+            res = (-piece - 8) << 3;
+        } else if (piece > att_piece - 1 && !(piece == 2 && att_piece - 1 == 1)) { // attacked by lesser piece (not NxB)
+            res = (-piece << 3) + att_piece;
+        }
     }
 
     if (get_move_capture(move)) {
-        int res = 150 + defenders[target] - attacked_punish;
+        int cap_piece = 0;
         for (int i = 0; i < 6; i++) {
-            if (get_bit(BOARD[i + 6 * TURN], target)) {
-                return res + ((i - piece_type) << 1);
+            if (get_bit(BOARD[6 * (TURN ^ 1) + i], target)) {
+                cap_piece = i;
+                break;
             }
         }
-        return res; // enpassant
+        if (cap_piece >= piece || (cap_piece == 1 && piece == 2)) { // capturing higher value piece (or BxN)
+            res = 0; // remove att penalties
+        }
+        if (!att_piece) { res += 20; } // free piece
+        return res + 60 + ((cap_piece - piece) << 2);
     }
-    if (move == KILLER_MOVES[0][ply]) { return 130; }
-    if (move == KILLER_MOVES[1][ply]) { return 125; }
-    return min(120, HISTORY_MOVES[piece][target]) - attacked_punish;
+    if (move == KILLER_MOVES[0][ply]) { return res + 60; }
+    if (move == KILLER_MOVES[1][ply]) { return res + 55; }
+    return res + HISTORY_MOVES[get_move_piece(move)][target] / max_history * 50; // map between 0 and 50
 }
 static inline void order_moves(moves* move_list) {
+    int max_history = 1;
     int defenders[64] = {};
     for (int i = 0; i < move_list -> count; i++) {
         int move = move_list -> moves[i];
-        if (get_move_capture(move)) {
-            defenders[get_move_target(move)] += 2 - (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
-        }
+        int piece = get_move_piece(move);
+        int target = get_move_target(move);
+        max_history = max(max_history, HISTORY_MOVES[piece][target]);
+        if (!(piece % 6) && !get_move_capture(move)) { continue; } // ignore pawn push
+        defenders[target] += 1 + (piece % 6 ? 0 : 1); // count pawns twice
     }
     int scores[move_list -> count];
     for (int i = 0; i < move_list -> count; i++) {
-        scores[i] = score_move(move_list -> moves[i], defenders);
+        int move = move_list -> moves[i];
+        scores[i] = score_move(move, defenders[get_move_target(move)], max_history);
     }    
     for (int i = 0; i < move_list -> count; i++) {
         for (int j = i + 1; j < move_list -> count; j++) {
@@ -1072,7 +1087,7 @@ int best_eval(int depth, int alpha, int beta) {
     if (is_repitition()) { return 0; }
 
     int score = read_hash(depth, alpha, beta);
-    if (ply && score != NULL_HASH) { return score; }
+    if (ply && score != NULL_HASH) { LOOKUP++; return score; }
     PV_LENGTH[ply] = ply;
     if (depth == 0 || ply >= MAX_PLY) { return best_eval_captures(8, alpha, beta); }
 
@@ -1133,27 +1148,32 @@ int best_eval(int depth, int alpha, int beta) {
     return alpha;
 }
 
-int search(int depth) {
+int search(int search_time=2500) {
     reset_search_tables();
     NODES = 0;
+    LOOKUP = 0;
     ply = 0;
     follow_pv = 0; 
     score_pv = 0;
 
     int eval = 0; 
-    for (int current_depth = 1; current_depth <= depth; current_depth++) {
+    int depth = 1;
+    auto start = high_resolution_clock::now();
+    while (duration_cast<microseconds>(high_resolution_clock::now() - start).count() <= search_time * 1000) {
         follow_pv = 1;
-        eval = best_eval(current_depth, -infinity, infinity);
+        eval = best_eval(depth, -infinity, infinity);
         if (TURN) { eval *= -1; }
 
-        printf("Depth: %i, analysed: %i, eval: %i, PV: ", current_depth, NODES, eval);
+        printf("Depth: %d, analysed: %d, lookup: %d, eval: %d, PV: ", depth, NODES, LOOKUP, eval);
         for (int i = 0; i < PV_LENGTH[0]; i++) {
             printf("%s ", get_move_desc(PV_TABLE[0][i]).c_str());
         }
         printf("\n");
         if (abs(eval) > mate_score) { break; }
+        depth++;
     } 
-    printf("Best move: %s, eval: %d\n\n", get_move_desc(PV_TABLE[0][0]).c_str(), eval);
+    int time = duration_cast<milliseconds>(high_resolution_clock::now() - start).count();
+    printf("Best move: %s, eval: %d, time (ms): %d\n\n", get_move_desc(PV_TABLE[0][0]).c_str(), eval, time);
     return eval;
 }
 
@@ -1168,10 +1188,6 @@ void play_game(string start_fen) {
 
         print_board();
 
-        int depth;
-        cout << "Set AI depth: ";
-        cin >> depth;
-
         // Human move
         string uci;
         cout << "Enter move uci: ";
@@ -1182,7 +1198,7 @@ void play_game(string start_fen) {
         pgn.append(" ");
 
         // Ai move
-        search(depth);
+        search();
         move = PV_TABLE[0][0];
         if (!do_move(move)) { printf("Invalid AI move\n"); break; }
         pgn.append(get_move_desc(move));
@@ -1230,13 +1246,17 @@ int main(int argc, char *argv[]) {
 
     initialise();
 
-    // play_game(start_position);
-    // return 0;
+    // create_board(start_position);
+    // print_board();
 
-    create_board(start_position);
-    print_board();
+    // moves move_list[1];
+    // generate_moves(move_list);
+    // print_move_list(move_list);
 
-    search(8);
+    // order_moves(move_list);
+    // print_move_list(move_list);
+
+    play_game(start_position);
 
     return 0;
 }

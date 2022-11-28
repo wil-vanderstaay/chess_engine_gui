@@ -14,6 +14,525 @@ function reset_search_tables() {
     for (let i = 0; i < MAX_PLY; i++) { pv_table[i] = new Array(MAX_PLY).fill(0); }
 }
 
+// BOOK -----------------------------------------------------------------------------------------------------------------------------------------------
+
+let book_games = [
+    "1. d4 d6 2. c4 g6 3. Nc3 Bg7 4. e4",
+    "1. d4 c5 2. d5 e5",
+    "1. d4 Nf6 2. Bg5 Ne4",
+    "1. d4 Nf6 2. Bg5 e6",
+    "1. d4 Nf6 2. Bg5 d5",
+    "1. d4 Nf6 2. Bg5 c5",
+    "1. d4 Nf6 2. Bg5 g6",
+    "1. d4 Nf6 2. Nf3 e6 3. Bg5",
+    "1. d4 Nf6 2. Nf3 g6 3. Bg5",
+    "1. d4 Nf6 2. Nf3 e6 3. Bf4",
+    "1. d4 Nf6 2. Nf3 g6 3. Bf4",
+    "1. d4 Nf6 2. c4 e6 3. g3 Bb4+",
+    "1. d4 Nf6 2. c4 e6 3. g3 c5",
+    "1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 dxc4",
+    "1. d4 Nf6 2. c4 e6 3. g3 d5 4. Bg2 Be7 5. Nf3",
+    "1. d4 Nf6 2. c4 Nc6",
+    "1. d4 Nf6 2. c4 e5",
+    "1. d4 Nf6 2. c4 d6",
+    "1. d4 Nf6 2. c4 c5 3. d5 e5 4. Nc3 d6",
+    "1. d4 Nf6 2. c4 c5 3. d5 b5",
+    "1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. Nf3",
+    "1. d4 Nf6 2. c4 c5 3. d5 e6 4. Nc3 exd5 5. cxd5 d6 6. e4",
+    "1. d4 f5 2. c4 Nf6 3. g3 g6 4. Bg2 Bg7 5. Nf3 O-O 6. O-O",
+    "1. d4 f5 2. c4 Nf6 3. g3 e6 4. Bg2",
+    "1. d4 f5 2. c4 Nf6 3. Nc3",
+    "1. d4 f5 2. Nc3",
+    "1. d4 f5 2. Bg5",
+    "1. d4 f5 2. e4",
+    "1. d4 Nf6 2. c4 g6 3. g3 d5 4. Bg2 Bg7 5. Nf3 O-O 6. O-O",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Nf3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Bf4",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Bg5",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. e3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. Qb3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 d5 4. cxd5 Nxd5 5. e4 Nxc3 6. bxc3 Bg7",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 Bb4+ 4. Bd2",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 Bb4+ 4. Nbd2",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. a3",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. Nc3",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. e3",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. Bg5",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. Bf4",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3 Ba6",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3 Bb7",
+    "1. d4 Nf6 2. c4 e6 3. Nf3 b6 4. g3 Bb4+",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Nf3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. a3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Bg5",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. f3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. g3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qb3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Bd2",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 O-O",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 d5",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 Nc6",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 b6",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 d6",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 c5",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 b6",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 d5",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 Nc6",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 Bxc3+",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Be2 O-O 6. Bg5",
+    "1. c4 Nf6 2. d4 g6 3. g3 Bg7 4. Bg2 d6 5. Nf3 O-O",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f4",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. f3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nc6",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. Be3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. dxe5",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. Bg5",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nbd7",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Na6",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O exd4",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O c6",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Nh5",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. O-O Qe8",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be2 e5 7. d5",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 Bg4",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 Nbd7",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 c6",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 c5",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. h3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Be3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Bg5",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. Bd3",
+    "1. d4 Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. Nf3 O-O 6. g3",
+    "1. d4 d5 2. Bg5",
+    "1. d4 d5 2. Nf3 Nf6 3. e3",
+    "1. d4 d5 2. c4 c5",
+    "1. d4 d5 2. c4 Bf5",
+    "1. d4 d5 2. c4 e5",
+    "1. d4 d5 2. c4 Nc6",
+    "1. d4 d5 2. c4 c6 3. Nf3 dxc4",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Qc2",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Qb3",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. g3",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nbd2",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. cxd5 cxd5 5. Nc3",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 a6",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. e4",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. e3",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. Ne5",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. g3",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. a4 Bg4",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. a4 Na6",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. a4 e6",
+    "1. d4 d5 2. c4 c6 3. Nf3 Nf6 4. Nc3 dxc4 5. a4 Bf5",
+    "1. d4 d5 2. c4 dxc4 3. e4",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 a6",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 c5",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. Nc3",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. Qa4+",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 Bg4",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 a6",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 g6",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 c5",
+    "1. d4 d5 2. c4 dxc4 3. Nf3 Nf6 4. e3 e6 5. Bxc4 c5",
+    "1. d4 d5 2. c4 e6 3. Nf3 c5",
+    "1. d4 d5 2. c4 e6 3. Nc3 c6 4. e4",
+    "1. d4 d5 2. c4 e6 3. Nc3 c6 4. Nf3 dxc4",
+    "1. d4 d5 2. c4 e6 3. Nc3 c6 4. cxd5 exd5",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 Nbd7",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 Bb4",
+    "1. d4 d5 2. c4 e6 3. Nc3 c5",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. cxd5",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 Be7 5. Bf4",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c5 5. e3 Nc6",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c5 5. cxd5",
+    "1. d4 d5 2. c4 e6 3. Nf3 Nf6 4. Nc3 c6 5. Qb3",
+    "1. d4 d5 2. c4 e6 3. Nf3 Nf6 4. Nc3 c6 5. Bf4",
+    "1. d4 d5 2. c4 e6 3. Nf3 Nf6 4. Nc3 c6 5. Bg5",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Nf3 c6 5. e3",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Nbd7",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 c5",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Bb4",
+    "1. d4 d5 2. c4 e6 3. Nc3 Nf6 4. Bg5 Be7",
+    "1. e4 b6",
+    "1. e4 Nc6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5",
+    "1. e4 d5 2. exd5 Nf6 3. d4",
+    "1. e4 d5 2. exd5 Nf6 3. c4",
+    "1. e4 d5 2. exd5 Nf6 3. Bb5+",
+    "1. e4 d5 2. exd5 Nf6 3. Nc3",
+    "1. e4 d5 2. exd5 Nf6 3. Nf3",
+    "1. e4 d5 2. exd5 Nf6 3. Bc4",
+    "1. e4 Nf6 2. Nc3 d5",
+    "1. e4 Nf6 2. e5 Nd5 3. c4",
+    "1. e4 Nf6 2. e5 Nd5 3. Nc3",
+    "1. e4 Nf6 2. e5 Nd5 3. Nf3",
+    "1. e4 Nf6 2. e5 Nd5 3. Bc4",
+    "1. e4 Nf6 2. e5 Nd5 3. g3",
+    "1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. c4 Nb6 5. exd6",
+    "1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. c4 Nb6 5. f4",
+    "1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. Nf3",
+    "1. e4 g6 2. d4 Bg7 3. Nf3",
+    "1. e4 g6 2. d4 Bg7 3. Nc3 d6",
+    "1. e4 g6 2. d4 Bg7 3. Nc3 c6",
+    "1. e4 g6 2. d4 Bg7 3. Nc3 c5",
+    "1. e4 g6 2. d4 Bg7 3. Nc3 a6",
+    "1. e4 g6 2. d4 Bg7 3. Nc3 d5",
+    "1. e4 g6 2. d4 Bg7 3. Nc3 Nc6",
+    "1. e4 g6 2. d4 Bg7 3. c3",
+    "1. e4 g6 2. d4 Bg7 3. f4",
+    "1. e4 g6 2. d4 Bg7 3. Be3",
+    "1. e4 g6 2. d4 Bg7 3. Bc4",
+    "1. e4 d6 2. d4 Nf6 3. Bd3",
+    "1. e4 d6 2. d4 Nf6 3. f3",
+    "1. e4 d6 2. d4 Nf6 3. Nd2",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 c6",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 e5",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 Nbd7",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. f4",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Be3",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Bg5",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. f3",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. g3",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Be2",
+    "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Nf3",
+    "1. e4 c6 2. Nc3 d5 3. Nf3",
+    "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. Bd3",
+    "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4",
+    "1. e4 c6 2. d4 d5 3. e5",
+    "1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Nf6",
+    "1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Nd7",
+    "1. e4 c6 2. d4 d5 3. Nc3 dxe4 4. Nxe4 Bf5",
+    "1. e4 e6 2. d3",
+    "1. e4 e6 2. Nf3",
+    "1. e4 e6 2. Qe2",
+    "1. e4 e6 2. Nc3",
+    "1. e4 e6 2. b3",
+    "1. e4 e6 2. c4",
+    "1. e4 e6 2. d4 d5 3. exd5",
+    "1. e4 e6 2. d4 d5 3. e5 c5 4. c3",
+    "1. e4 e6 2. d4 d5 3. Nd2 Nc6",
+    "1. e4 e6 2. d4 d5 3. Nd2 Be7",
+    "1. e4 e6 2. d4 d5 3. Nd2 a6",
+    "1. e4 e6 2. d4 d5 3. Nd2 c5",
+    "1. e4 e6 2. d4 d5 3. Nd2 Nf6",
+    "1. e4 e6 2. d4 d5 3. Nc3 dxe4 4. Nxe4",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. Ne2",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. exd5",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. Bd3",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. a3",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 Ne7",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 b6",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 Qd7",
+    "1. e4 e6 2. d4 d5 3. Nc3 Bb4 4. e5 c5",
+    "1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. e5",
+    "1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 Bb4",
+    "1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 dxe4",
+    "1. e4 e6 2. d4 d5 3. Nc3 Nf6 4. Bg5 Be7",
+    "1. e4 c5 2. d3",
+    "1. e4 c5 2. b3",
+    "1. e4 c5 2. c4",
+    "1. e4 c5 2. g3",
+    "1. e4 c5 2. Ne2",
+    "1. e4 c5 2. Bc4",
+    "1. e4 c5 2. b4",
+    "1. e4 c5 2. f4",
+    "1. e4 c5 2. d4 cxd4 3. c3",
+    "1. e4 c5 2. c3 e6",
+    "1. e4 c5 2. c3 d6",
+    "1. e4 c5 2. c3 e5",
+    "1. e4 c5 2. c3 Nc6",
+    "1. e4 c5 2. c3 d5",
+    "1. e4 c5 2. c3 Nf6",
+    "1. e4 c5 2. Nc3 e6",
+    "1. e4 c5 2. Nc3 d6",
+    "1. e4 c5 2. Nc3 Nc6 3. f4",
+    "1. e4 c5 2. Nc3 Nc6 3. Nf3",
+    "1. e4 c5 2. Nc3 Nc6 3. Nge2",
+    "1. e4 c5 2. Nc3 Nc6 3. Bb5",
+    "1. e4 c5 2. Nc3 Nc6 3. g3",
+    "1. e4 c5 2. Nf3 g6",
+    "1. e4 c5 2. Nf3 a6",
+    "1. e4 c5 2. Nf3 Nf6",
+    "1. e4 c5 2. Nf3 Nc6 3. Bb5",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Qc7",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Qb6",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 e5",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Qb6",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 g6",
+    "1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e5 6. Ndb5 d6",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Be2",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Be3",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. g3",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. c4",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Nc3",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 a6 5. Bd3",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Be3",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nxc6",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. c4",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Be2",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. g3",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nb5",
+    "1. e4 c5 2. Nf3 e6 3. d4 cxd4 4. Nxd4 Nc6 5. Nc3",
+    "1. e4 c5 2. Nf3 d6 3. Bb5+",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Qxd4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. g3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. f4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. f3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Bg5",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be2",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Bc4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 g6 6. Be3 Bg7 7. f3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Be2",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Be3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. f3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. g3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. f4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bc4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 6. Bg5",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. a4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. g3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. f3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. f4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bc4",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be3",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be2",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5",
+    "1. e4 e5 2. d4 exd4",
+    "1. e4 e5 2. Bc4",
+    "1. e4 e5 2. f4",
+    "1. e4 e5 2. Nc3",
+    "1. e4 e5 2. Nf3 f5",
+    "1. e4 e5 2. Nf3 d5",
+    "1. e4 e5 2. Nf3 d6",
+    "1. e4 e5 2. Nf3 Nf6 3. Nc3",
+    "1. e4 e5 2. Nf3 Nf6 3. d4",
+    "1. e4 e5 2. Nf3 Nf6 3. d3",
+    "1. e4 e5 2. Nf3 Nf6 3. Bc4",
+    "1. e4 e5 2. Nf3 Nf6 3. Nxe5 d6 4. Nf3 Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. c3",
+    "1. e4 e5 2. Nf3 Nc6 3. Nc3 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Nc3 g6",
+    "1. e4 e5 2. Nf3 Nc6 3. Nc3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Nc3 Bb4",
+    "1. e4 e5 2. Nf3 Nc6 3. Nc3 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. c3",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Bc4",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Qh4",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Nxd4",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Qf6",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Bb4+",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 g6",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. d4 exd4 4. Nxd4 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 g6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nge7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 f5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Bxc6 dxc6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. Qe2",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O b5 6. Bb3 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Bxc6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Qe2",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. d4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. d3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Nc3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. a4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. h3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. d4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. d3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. d4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. d3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. a4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nd7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 h6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Be6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Na5 10. Bc2 c5",
+    "1. c4 b6",
+    "1. c4 f5",
+    "1. c4 c6",
+    "1. c4 g6",
+    "1. c4 c5 2. Nf3 Nf6 3. g3 b6 4. Bg2 Bb7 5. O-O g6",
+    "1. c4 c5 2. Nf3 Nf6 3. g3 b6 4. Bg2 Bb7 5. O-O e6",
+    "1. c4 c5 2. Nf3 Nf6 3. d4",
+    "1. c4 c5 2. Nc3 Nf6 3. Nf3 e6",
+    "1. c4 c5 2. Nc3 Nf6 3. Nf3 d5",
+    "1. c4 c5 2. Nc3 Nf6 3. Nf3 g6",
+    "1. c4 c5 2. Nc3 Nf6 3. Nf3 b6",
+    "1. c4 c5 2. Nc3 Nf6 3. Nf3 Nc6",
+    "1. c4 c5 2. Nc3 Nc6 3. g3 g6 4. Bg2 Bg7",
+    "1. c4 e6 2. Nf3 d5",
+    "1. c4 e6 2. Nc3 d5",
+    "1. c4 e6 2. Nc3 Nf6 3. e4",
+    "1. c4 e6 2. Nc3 Nf6 3. Nf3",
+    "1. c4 e5 2. g3",
+    "1. c4 e5 2. Nc3 d6",
+    "1. c4 e5 2. Nc3 Bb4",
+    "1. c4 e5 2. Nc3 Nf6 3. Nf3 Nc6",
+    "1. c4 e5 2. Nc3 Nf6 3. g3",
+    "1. c4 e5 2. Nc3 Nc6",
+    "1. c4 Nf6 2. g3",
+    "1. c4 Nf6 2. Nf3 g6 3. g3 Bg7 4. Bg2 O-O",
+    "1. c4 Nf6 2. Nc3 g6",
+    "1. Nf3 d5 2. b3",
+    "1. Nf3 d5 2. c4",
+    "1. Nf3 d5 2. g3",
+
+    // Scandinavian
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Nf6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Bd7",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Be6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 e6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 c6",
+    "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5 4. d4 Nc6",
+
+    // Ruy lopez berlin
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Bxc6 dxc6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. dxe5 Nxb5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Nd6 6. Ba4 exd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 a6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 5. d4 Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nxe5 Nxe5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Nxe5 Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 Bb6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. c3 Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. c3 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. Nbd2 O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bd6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3 Bb4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3 Nd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. Nc3 Bc5",
+
+    // Ruy lopez morphy
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. d3 b5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5 9. exd5 Nxd5 10. Nxe5 Nxe5 11. Rxe5 c6 12. d4 Bd6 13. Re1 Qh4 14. g3 Qh3 15. Be3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5 9. exd5 Nxd5 10. Nxe5 Nxe5 11. Rxe5 c6 12. d4 Bd6 13. Re1 Qh4 14. g3 Qh3 15. Re4 g5 16. Qf1 Qxf1",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5 9. exd5 Nxd5 10. Nxe5 Nxe5 11. Rxe5 c6 12. d4 Bd6 13. Re1 Qh4 14. g3 Qh3 15. Re4 g5 16. Qf1 Qh5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5 9. exd5 Nxd5 10. Nxe5 Nxe5 11. Rxe5 c6 12. d4 Bd6 13. Re1 Qh4 14. g3 Qh3 15. Bxd5 cxd5 16. Qf3 Bf5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d5 9. exd5 Nxd5 10. Nxe5 Nxe5 11. Rxe5 c6 12. d4 Bd6 13. Re1 Qh4 14. g3 Qh3 15. Bxd5 cxd5 16. Qf3 Bg4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. c3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. h3 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. a4 b4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 O-O 8. a4 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O b5 6. Bb3 Bb7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O b5 6. Bb3 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O b5 6. Bb3 Be7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. dxe5 Be6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. Nxe5 Nxe5",
+
+    // Italian
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. O-O",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. Nbd2",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. c3",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxd4 6. Qxd4 Bd6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxd4 6. Qxd4 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxd4 6. Qxd4 d5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. Nxc6 bxe6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. Nxc6 dxe6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. O-O d5 7. Bb5 Bd7",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. O-O d5 7. Bb3 Nxd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 exd4 5. Nxd4 Nxe4 6. O-O d5 7. Re1 Nxd4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 d6 5. Nc3 Bg4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 d6 5. O-O Bg4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 Nxe4 5. dxe5 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 Nxe4 5. d5 Nd6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d4 Nxe4 5. Nxe5 d5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Nxe4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Bc5",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Bb4",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Bb6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O Bb6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 d6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 Nf6",
+    "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. d3 h6",
+    
+    // Alapin sicilian
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. Nf3",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. Nf3 Nc6",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. Nf3 e6",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. cxd4 d6",
+    "1. e4 c5 2. c3 Nf6 3. e5 Nd5 4. d4 cxd4 5. cxd4 e6",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 e6",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 Bg4",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nc6",
+    "1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 e6",
+
+    // Nimzo
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. Nf3 cxd4 6. Nxd4 O-O 7. e3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. Nf3 d5 6. e3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. Nf3 d5 6. a3 Bxc3+ 7. Qxc3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. Nf3 d5 6. Bg5",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 O-O 6. a3 Bxc5 7. Nf3 Nc6 8. Bg5 Nd4 9. Nxd4",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 O-O 6. a3 Bxc5 7. Nf3 Nc6 8. e3 d5 9. b4",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 O-O 6. a3 Bxc5 7. Bf4",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 O-O 6. Nf3 Na6 7. g3",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 O-O 6. Nf3 Na6 7. Bd2",
+    "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 O-O 6. Nf3 Na6 7. e3",
+
+    // Scotch games
+    // French
+    // Caro cann
+];
+
+function book_move() {
+    if (document.getElementById("stored_fen").value != START_FEN) {
+        return 0;
+    }
+
+    let res = [];
+    // Find book games following current game
+    let game_so_far = get_game_moves();
+    for (let i = 0; i < book_games.length; i++) {
+        if (book_games[i].startsWith(game_so_far)) {
+            res.push(i);
+        }
+    }
+    if (!res.length) { return 0; }
+    // Select random book game and extract next move
+    let game = book_games[res[Math.floor(Math.random() * res.length)]];
+    let move = "";
+    let i = game_so_far.length;
+    while (game[i].toLowerCase() == game[i].toUpperCase()) {
+        i += 1
+    }
+    while (i < game.length) {
+        if (game[i] == " ") { break; }
+        move += game[i];
+        i++;
+    }
+    return create_move_san(move);
+}
+
 // EVALUATE -----------------------------------------------------------------------------------------------------------------------------------------------
 
 let piece_values = [
@@ -172,7 +691,7 @@ function evaluate_board() {
     return (TURN) ? -res : res;
 }
 
-function score_move(move, defenders) {
+function score_move(move, defenders, max_history) {
     if (score_pv && move == pv_table[0][ply]) {
         score_pv = 0;
         return 150;
@@ -208,20 +727,25 @@ function score_move(move, defenders) {
     }
     if (move == killer_moves[0][ply]) { return res + 60; }
     else if (move == killer_moves[1][ply]) { return res + 55; }
-    return res + Math.min(50, history_moves[get_move_piece(move)][target]);
+    return res + history_moves[get_move_piece(move)][target] / max_history * 50; // maps history moves between 0 and 50
+    // return res + Math.min(50, history_moves[get_move_piece(move)][target]);
 }
 
 function order_moves(moves, best_move=0) {
+    let max_history = 1;
     let defenders = new Array(64).fill(-1);
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
-        if (!(get_move_piece(move) % 6) && !get_move_capture(move)) { continue; } // ignore pawn pushes
-        defenders[get_move_target(move)] += 1 + (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
+        let piece = get_move_piece(move);
+        let target = get_move_target(move);
+        max_history = Math.max(max_history, history_moves[piece][target]);
+        if (!(piece % 6) && !get_move_capture(move)) { continue; } // ignore pawn pushes
+        defenders[target] += 1 + (piece % 6 ? 0 : 1); // count pawns twice
     }
     let res = [];
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
-        let score = (move == best_move) ? 160 : score_move(move, defenders[get_move_target(move)]);
+        let score = (move == best_move) ? 160 : score_move(move, defenders[get_move_target(move)], max_history);
         res.push([score, moves[i]]);
     }
     res.sort(function(a, b) { return b[0] - a[0]; });
@@ -245,6 +769,7 @@ function enable_pv_scoring(moves) {
 }
 
 // SEARCH -----------------------------------------------------------------------------------------------------------------------------------------------
+
 function best_eval_captures(depth, alpha, beta) {
     COUNT++;
 
@@ -335,7 +860,7 @@ function best_eval(depth, alpha, beta) {
         if (eval > alpha) {
             hash_flag = 1;
             if (!get_move_capture(move)) {
-                history_moves[get_move_piece(move)][get_move_target(move)] += depth * depth;
+                history_moves[get_move_piece(move)][get_move_target(move)] += depth;
             }
             alpha = eval;
             best_move = move;
@@ -366,14 +891,20 @@ function best_eval(depth, alpha, beta) {
     return alpha;
 }
 
-function search(search_time=2500) {
+function search(search_time=1500) {
     reset_search_tables();
+
+    let move = book_move();
+    if (move) {
+        console.log("Book");
+        pv_table[0][0] = move;
+        return [0, 0];
+    } 
 
     let eval;
     let depth = 1;
     let start = performance.now();
-    for (; depth < 7;) {
-    // while (performance.now() - start <= search_time) {
+    while (performance.now() - start <= search_time) {
         follow_pv = 1;
 
         eval = best_eval(depth, -Infinity, Infinity);
@@ -385,7 +916,7 @@ function search(search_time=2500) {
         }
         console.log(res);
         if (Math.abs(eval) > 99900) { break; }
-        depth++;        
+        depth++;       
     }
     let time = Math.round(performance.now() - start);
     console.log("Best move: " + (get_move_san(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (time));

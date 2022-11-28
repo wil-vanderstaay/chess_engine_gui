@@ -105,7 +105,7 @@ function get_move_uci(move) {
     let promote = get_move_promote(move) % 6;
     return square_name(get_move_source(move)) + square_name(get_move_target(move)) + (promote ? letters[promote] : ""); 
 }
-function get_move_san(move, moves=[]) { 
+function get_move_san(move) { 
     let uci = get_move_uci(move);
 
     let res = "";
@@ -121,15 +121,14 @@ function get_move_san(move, moves=[]) {
     res += letters[piece % 6];
     if (!res && capture) { res += uci[0]; }
     // Disambiguate moves Nge2
-    if (moves.length) {
-        for (let i = 0; i < moves.length; i++) {
-            let m = moves[i];
-            if (m != move && piece % 6 && get_move_piece(m) == piece && get_move_target(m) == target) {
-                let ms = get_move_source(m);
-                if ((ms % 8) == (source % 8)) { res += uci[1]; }
-                else { res += uci[0]; }
-                break;
-            }
+    let moves = generate_pseudo_moves();
+    for (let i = 0; i < moves.length; i++) {
+        let m = moves[i];
+        if (m != move && piece % 6 && get_move_piece(m) == piece && get_move_target(m) == target) {
+            let ms = get_move_source(m);
+            if ((ms % 8) == (source % 8)) { res += uci[1]; }
+            else { res += uci[0]; }
+            break;
         }
     }
     if (capture) { res += "x"; }
@@ -334,10 +333,10 @@ function legal_move(pos, new_pos) { // determine if moving from pos to new_pos i
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
         if (get_move_source(move) == pos && get_move_target(move) == new_pos) {
-            return [move, moves];
+            return move;
         }
     }
-    return [0, moves];
+    return 0;
 }
 
 function print_board(board) {
@@ -960,7 +959,6 @@ function is_repetition() {
 function run_setup_board() {
     let button = document.getElementById("setup");
     if (button.style.backgroundColor == "rgb(187, 224, 174)") {
-        console.log("HERE");
         if (count_bits(BOARD[5]) != 1 || count_bits(BOARD[11]) != 1) {
             alert("Invalid position");
             setup_board();
@@ -1403,16 +1401,15 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
     function doLegalMove(new_pos) {
         let source = PLAYER_WHITE ? pos : 63 - pos;
         let target = PLAYER_WHITE ? new_pos : 63 - new_pos;
-        let res = legal_move(source, target);
-        let move = res[0]; 
-        let moves = res[1];
+        let move = legal_move(source, target);
         if (move) {
             if (get_move_promote(move)) { // ask for promote input
                 move |= 983040; // set promote 15
             }
+            let san = get_move_san(move);
             if (do_move(move)) {
                 GAME.push(copy_board(BOARD));
-                GAME_MOVES.push(get_move_san(move, moves));
+                GAME_MOVES.push(san);
                 GAME_HASH.push(copy_bitboard(hash_key));
 
                 document.getElementById("loading").innerHTML = "LOADING";
@@ -1440,15 +1437,14 @@ function doAiMove() {
     let evaluation = res[0]; 
 
     let best_move = pv_table[0][0];
-    let moves = generate_pseudo_moves();
-
+    let san = get_move_san(best_move);
     if (!do_move(best_move)) {
         finish();
         return false;
     }
 
     GAME.push(copy_board(BOARD));
-    GAME_MOVES.push(get_move_san(best_move, moves));
+    GAME_MOVES.push(san);
     GAME_HASH.push(copy_bitboard(hash_key));
 
     evaluation = Math.round(evaluation + Number.EPSILON);
