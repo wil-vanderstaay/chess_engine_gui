@@ -1,225 +1,21 @@
-function perft(depth, print=1) {
-    if (depth == 0) { return 1; }
-    
-    let res = 0;
-    let moves = generate_pseudo_moves();
-    for (let i = 0; i < moves.length; i++) {
-        let move = moves[i];
-
-        // Copy state
-        let cb = copy_board(BOARD);
-        let copy_castle = CASTLE;
-        let copy_en = EN_PASSANT_SQUARE;
-        let copy_turn = TURN;
-
-        // Do move
-        if (!do_move(move)) {
-            continue;
-        }
-
-        let start_res = res;
-        res += perft(depth - 1, 0);   
-
-        // Print 
-        if (print) {
-            let letters = "abcdefgh";
-            let move_source = get_move_source(move);
-            let move_target = get_move_target(move);
-            let start_pos = letters[move_source % 8] + (8 - (move_source  >> 3));
-            let end_pos = letters[move_target % 8] + (8 - (move_target >> 3));
-            console.log(start_pos, end_pos, res - start_res);
-        }
-
-        // Reset state
-        BOARD = cb;
-        CASTLE = copy_castle;
-        EN_PASSANT_SQUARE = copy_en;
-        TURN = copy_turn;
-    }
-    return res;
-}
-
-function time_perft(depth) {
-    let s = performance.now();
-    perft(depth, 1);
-    console.log("PERFT TIME", performance.now() - s);
-}
-
-// CONSTANTS -----------------------------------------------------------------------------------------------------------------------------------------------
-
 function reset_search_tables() {
-    // Killer moves - moves that cause snip in earlier iteration, check sooner
-    killer_moves = [new Array(MAX_PLY), new Array(MAX_PLY)]; // id, ply
+    COUNT = 0; 
+    LOOKUP = 0;
+    ply = 0;
+    follow_pv = 0; 
+    score_pv = 0;
 
-    // History moves
+    killer_moves = [new Array(MAX_PLY).fill(0), new Array(MAX_PLY).fill(0)];
     history_moves = new Array(12); // piece, square
     for (let i = 0; i < 12; i++) { history_moves[i] = new Array(64).fill(0); }
 
-    pv_length = new Array(MAX_PLY); // ply
+    pv_length = new Array(MAX_PLY).fill(0); // ply
     pv_table = new Array(MAX_PLY); // ply, ply
-    for (let i = 0; i < MAX_PLY; i++) { pv_table[i] = new Array(MAX_PLY); }
+    for (let i = 0; i < MAX_PLY; i++) { pv_table[i] = new Array(MAX_PLY).fill(0); }
 }
-
-let piece_values = [
-    // opening material score
-    82, 337, 365, 477, 1025, 0,
-    
-    // endgame material score
-    94, 281, 297, 512, 936, 0
-];
-
-let piece_position_values = [
-    //pawn
-    [
-        0,   0,   0,   0,   0,   0,  0,   0,
-        98, 134,  61,  95,  68, 126, 34, -11,
-        -6,   7,  26,  31,  65,  56, 25, -20,
-        -14,  13,   6,  21,  23,  12, 17, -23,
-        -27,  -2,  -5,  12,  17,   6, 10, -25,
-        -26,  -4,  -4, -10,   3,   3, 33, -12,
-        -35,  -1, -20, -23, -15,  24, 38, -22,
-        0,   0,   0,   0,   0,   0,  0,   0,
-    ],
-    
-    // knight
-    [
-        -167, -89, -34, -49,  61, -97, -15, -107,
-        -73, -41,  72,  36,  23,  62,   7,  -17,
-        -47,  60,  37,  65,  84, 129,  73,   44,
-        -9,  17,  19,  53,  37,  69,  18,   22,
-        -13,   4,  16,  13,  28,  19,  21,   -8,
-        -23,  -9,  12,  10,  19,  17,  25,  -16,
-        -29, -53, -12,  -3,  -1,  18, -14,  -19,
-        -105, -21, -58, -33, -17, -28, -19,  -23,
-    ],
-    
-    // bishop
-    [
-        -29,   4, -82, -37, -25, -42,   7,  -8,
-        -26,  16, -18, -13,  30,  59,  18, -47,
-        -16,  37,  43,  40,  35,  50,  37,  -2,
-        -4,   5,  19,  50,  37,  37,   7,  -2,
-        -6,  13,  13,  26,  34,  12,  10,   4,
-        0,  15,  15,  15,  14,  27,  18,  10,
-        4,  15,  16,   0,   7,  21,  33,   1,
-        -33,  -3, -14, -21, -13, -12, -39, -21,
-    ],
-
-    // rook
-    [
-        32,  42,  32,  51, 63,  9,  31,  43,
-        27,  32,  58,  62, 80, 67,  26,  44,
-        -5,  19,  26,  36, 17, 45,  61,  16,
-        -24, -11,   7,  26, 24, 35,  -8, -20,
-        -36, -26, -12,  -1,  9, -7,   6, -23,
-        -45, -25, -16, -17,  3,  0,  -5, -33,
-        -44, -16, -20,  -9, -1, 11,  -6, -71,
-        -19, -13,   1,  17, 16,  7, -37, -26,
-    ],
-            
-    // queen
-    [
-        -28,   0,  29,  12,  59,  44,  43,  45,
-        -24, -39,  -5,   1, -16,  57,  28,  54,
-        -13, -17,   7,   8,  29,  56,  47,  57,
-        -27, -27, -16, -16,  -1,  17,  -2,   1,
-        -9, -26,  -9, -10,  -2,  -4,   3,  -3,
-        -14,   2, -11,  -2,  -5,   2,  14,   5,
-        -35,  -8,  11,   2,   8,  15,  -3,   1,
-        -1, -18,  -9,  10, -15, -25, -31, -50,
-    ],
-    
-    // king
-    [
-        -65,  23,  16, -15, -56, -34,   2,  13,
-        29,  -1, -20,  -7,  -8,  -4, -38, -29,
-        -9,  24,   2, -16, -20,   6,  22, -22,
-        -17, -20, -12, -27, -30, -25, -14, -36,
-        -49,  -1, -27, -39, -46, -44, -33, -51,
-        -14, -14, -22, -46, -44, -30, -15, -27,
-        1,   7,  -8, -64, -43, -16,   9,   8,
-        -15,  36,  12, -54,   8, -28,  24,  14,
-    ],
-
-
-    // Endgame positional piece scores //
-
-    //pawn
-    [
-        0,   0,   0,   0,   0,   0,   0,   0,
-        178, 173, 158, 134, 147, 132, 165, 187,
-        94, 100,  85,  67,  56,  53,  82,  84,
-        32,  24,  13,   5,  -2,   4,  17,  17,
-        13,   9,  -3,  -7,  -7,  -8,   3,  -1,
-        4,   7,  -6,   1,   0,  -5,  -1,  -8,
-        13,   8,   8,  10,  13,   0,   2,  -7,
-        0,   0,   0,   0,   0,   0,   0,   0,
-    ],
-    
-    // knight
-    [
-        -58, -38, -13, -28, -31, -27, -63, -99,
-        -25,  -8, -25,  -2,  -9, -25, -24, -52,
-        -24, -20,  10,   9,  -1,  -9, -19, -41,
-        -17,   3,  22,  22,  22,  11,   8, -18,
-        -18,  -6,  16,  25,  16,  17,   4, -18,
-        -23,  -3,  -1,  15,  10,  -3, -20, -22,
-        -42, -20, -10,  -5,  -2, -20, -23, -44,
-        -29, -51, -23, -15, -22, -18, -50, -64,
-    ],
-    
-    // bishop
-    [
-        -14, -21, -11,  -8, -7,  -9, -17, -24,
-        -8,  -4,   7, -12, -3, -13,  -4, -14,
-        2,  -8,   0,  -1, -2,   6,   0,   4,
-        -3,   9,  12,   9, 14,  10,   3,   2,
-        -6,   3,  13,  19,  7,  10,  -3,  -9,
-        -12,  -3,   8,  10, 13,   3,  -7, -15,
-        -14, -18,  -7,  -1,  4,  -9, -15, -27,
-        -23,  -9, -23,  -5, -9, -16,  -5, -17,
-    ],
-
-    // rook
-    [
-        13, 10, 18, 15, 12,  12,   8,   5,
-        11, 13, 13, 11, -3,   3,   8,   3,
-        7,  7,  7,  5,  4,  -3,  -5,  -3,
-        4,  3, 13,  1,  2,   1,  -1,   2,
-        3,  5,  8,  4, -5,  -6,  -8, -11,
-        -4,  0, -5, -1, -7, -12,  -8, -16,
-        -6, -6,  0,  2, -9,  -9, -11,  -3,
-        -9,  2,  3, -1, -5, -13,   4, -20,
-    ],
-            
-    // queen
-    [
-        -9,  22,  22,  27,  27,  19,  10,  20,
-        -17,  20,  32,  41,  58,  25,  30,   0,
-        -20,   6,   9,  49,  47,  35,  19,   9,
-        3,  22,  24,  45,  57,  40,  57,  36,
-        -18,  28,  19,  47,  31,  34,  39,  23,
-        -16, -27,  15,   6,   9,  17,  10,   5,
-        -22, -23, -30, -16, -16, -23, -36, -32,
-        -33, -28, -22, -43,  -5, -32, -20, -41,
-    ],
-    
-    // king
-    [
-        -74, -35, -18, -18, -11,  15,   4, -17,
-        -12,  17,  14,  17,  17,  38,  23,  11,
-        10,  17,  23,  15,  20,  45,  44,  13,
-        -8,  22,  24,  27,  26,  33,  26,   3,
-        -18,  -4,  21,  24,  27,  23,   9, -11,
-        -19,  -3,  11,  21,  23,  16,   7,  -9,
-        -27, -11,   4,  13,  14,   4,  -5, -17,
-        -53, -34, -21, -11, -28, -14, -24, -43
-    ]
-];
 
 // BOOK -----------------------------------------------------------------------------------------------------------------------------------------------
 
-// Accepted list of openings
 let book_games = [
     "1. d4 d6 2. c4 g6 3. Nc3 Bg7 4. e4",
     "1. d4 c5 2. d5 e5",
@@ -403,7 +199,6 @@ let book_games = [
     "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. g3",
     "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Be2",
     "1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Nf3",
-    "1. e4 c6 2. c4",
     "1. e4 c6 2. Nc3 d5 3. Nf3",
     "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. Bd3",
     "1. e4 c6 2. d4 d5 3. exd5 cxd5 4. c4",
@@ -740,6 +535,123 @@ function book_move() {
 
 // EVALUATE -----------------------------------------------------------------------------------------------------------------------------------------------
 
+let piece_values = [
+    82, 337, 365, 477, 1025, 0, // opening material score
+    94, 281, 297, 512, 936, 0 // endgame material score
+];
+
+let piece_position_values = [
+    [   0,   0,   0,   0,   0,   0,  0,   0, //pawn
+        98, 134,  61,  95,  68, 126, 34, -11,
+        -6,   7,  26,  31,  65,  56, 25, -20,
+        -14,  13,   6,  21,  23,  12, 17, -23,
+        -27,  -2,  -5,  12,  17,   6, 10, -25,
+        -26,  -4,  -4, -10,   3,   3, 33, -12,
+        -35,  -1, -20, -23, -15,  24, 38, -22,
+        0,   0,   0,   0,   0,   0,  0,   0,
+    ],
+    [   -167, -89, -34, -49,  61, -97, -15, -107, // knight
+        -73, -41,  72,  36,  23,  62,   7,  -17,
+        -47,  60,  37,  65,  84, 129,  73,   44,
+        -9,  17,  19,  53,  37,  69,  18,   22,
+        -13,   4,  16,  13,  28,  19,  21,   -8,
+        -23,  -9,  12,  10,  19,  17,  25,  -16,
+        -29, -53, -12,  -3,  -1,  18, -14,  -19,
+        -105, -21, -58, -33, -17, -28, -19,  -23,
+    ],
+    [   -29,   4, -82, -37, -25, -42,   7,  -8, // bishop
+        -26,  16, -18, -13,  30,  59,  18, -47,
+        -16,  37,  43,  40,  35,  50,  37,  -2,
+        -4,   5,  19,  50,  37,  37,   7,  -2,
+        -6,  13,  13,  26,  34,  12,  10,   4,
+        0,  15,  15,  15,  14,  27,  18,  10,
+        4,  15,  16,   0,   7,  21,  33,   1,
+        -33,  -3, -14, -21, -13, -12, -39, -21,
+    ],
+    [   32,  42,  32,  51, 63,  9,  31,  43, // rook
+        27,  32,  58,  62, 80, 67,  26,  44,
+        -5,  19,  26,  36, 17, 45,  61,  16,
+        -24, -11,   7,  26, 24, 35,  -8, -20,
+        -36, -26, -12,  -1,  9, -7,   6, -23,
+        -45, -25, -16, -17,  3,  0,  -5, -33,
+        -44, -16, -20,  -9, -1, 11,  -6, -71,
+        -19, -13,   1,  17, 16,  7, -37, -26,
+    ],      
+    [   -28,   0,  29,  12,  59,  44,  43,  45, // queen
+        -24, -39,  -5,   1, -16,  57,  28,  54,
+        -13, -17,   7,   8,  29,  56,  47,  57,
+        -27, -27, -16, -16,  -1,  17,  -2,   1,
+        -9, -26,  -9, -10,  -2,  -4,   3,  -3,
+        -14,   2, -11,  -2,  -5,   2,  14,   5,
+        -35,  -8,  11,   2,   8,  15,  -3,   1,
+        -1, -18,  -9,  10, -15, -25, -31, -50,
+    ],
+    [   -65,  23,  16, -15, -56, -34,   2,  13, // king
+        29,  -1, -20,  -7,  -8,  -4, -38, -29,
+        -9,  24,   2, -16, -20,   6,  22, -22,
+        -17, -20, -12, -27, -30, -25, -14, -36,
+        -49,  -1, -27, -39, -46, -44, -33, -51,
+        -14, -14, -22, -46, -44, -30, -15, -27,
+        1,   7,  -8, -64, -43, -16,   9,   8,
+        -15,  36,  12, -54,   8, -28,  24,  14,
+    ],
+    // Endgame positional piece scores //
+    [   0,   0,   0,   0,   0,   0,   0,   0, //pawn
+        178, 173, 158, 134, 147, 132, 165, 187,
+        94, 100,  85,  67,  56,  53,  82,  84,
+        32,  24,  13,   5,  -2,   4,  17,  17,
+        13,   9,  -3,  -7,  -7,  -8,   3,  -1,
+        4,   7,  -6,   1,   0,  -5,  -1,  -8,
+        13,   8,   8,  10,  13,   0,   2,  -7,
+        0,   0,   0,   0,   0,   0,   0,   0,
+    ],
+    [   -58, -38, -13, -28, -31, -27, -63, -99, // knight
+        -25,  -8, -25,  -2,  -9, -25, -24, -52,
+        -24, -20,  10,   9,  -1,  -9, -19, -41,
+        -17,   3,  22,  22,  22,  11,   8, -18,
+        -18,  -6,  16,  25,  16,  17,   4, -18,
+        -23,  -3,  -1,  15,  10,  -3, -20, -22,
+        -42, -20, -10,  -5,  -2, -20, -23, -44,
+        -29, -51, -23, -15, -22, -18, -50, -64,
+    ],
+    [   -14, -21, -11,  -8, -7,  -9, -17, -24, // bishop
+        -8,  -4,   7, -12, -3, -13,  -4, -14,
+        2,  -8,   0,  -1, -2,   6,   0,   4,
+        -3,   9,  12,   9, 14,  10,   3,   2,
+        -6,   3,  13,  19,  7,  10,  -3,  -9,
+        -12,  -3,   8,  10, 13,   3,  -7, -15,
+        -14, -18,  -7,  -1,  4,  -9, -15, -27,
+        -23,  -9, -23,  -5, -9, -16,  -5, -17,
+    ],
+    [   13, 10, 18, 15, 12,  12,   8,   5, // rook
+        11, 13, 13, 11, -3,   3,   8,   3,
+        7,  7,  7,  5,  4,  -3,  -5,  -3,
+        4,  3, 13,  1,  2,   1,  -1,   2,
+        3,  5,  8,  4, -5,  -6,  -8, -11,
+        -4,  0, -5, -1, -7, -12,  -8, -16,
+        -6, -6,  0,  2, -9,  -9, -11,  -3,
+        -9,  2,  3, -1, -5, -13,   4, -20,
+    ],
+    [   -9,  22,  22,  27,  27,  19,  10,  20, // queen
+        -17,  20,  32,  41,  58,  25,  30,   0,
+        -20,   6,   9,  49,  47,  35,  19,   9,
+        3,  22,  24,  45,  57,  40,  57,  36,
+        -18,  28,  19,  47,  31,  34,  39,  23,
+        -16, -27,  15,   6,   9,  17,  10,   5,
+        -22, -23, -30, -16, -16, -23, -36, -32,
+        -33, -28, -22, -43,  -5, -32, -20, -41,
+    ],
+    [   -74, -35, -18, -18, -11,  15,   4, -17, // king
+        -12,  17,  14,  17,  17,  38,  23,  11,
+        10,  17,  23,  15,  20,  45,  44,  13,
+        -8,  22,  24,  27,  26,  33,  26,   3,
+        -18,  -4,  21,  24,  27,  23,   9, -11,
+        -19,  -3,  11,  21,  23,  16,   7,  -9,
+        -27, -11,   4,  13,  14,   4,  -5, -17,
+        -53, -34, -21, -11, -28, -14, -24, -43
+    ]
+];
+
 function get_gamephase_score() {
     let res = 0;
     for (let i = 1; i < 5; i++) {
@@ -749,33 +661,22 @@ function get_gamephase_score() {
     return res;
 }
 
-function piece_val_map(piece, pos, opening) {
-    if (piece >= 6) {
-        piece -= 6;
-        pos += (7 - (pos >> 3 << 1)) << 3; // flip rows
-    }
-    if (!PLAYER_WHITE) {
-        pos += 7 - (pos % 8 << 1); // flip cols
-    }
-    if (opening) { return piece_values[piece] + piece_position_values[piece][pos]; }
-    return piece_values[piece + 6] + piece_position_values[piece + 6][pos]; 
-}
-
-function evaluate_board() { // LOWER BOUND
+function evaluate_board() {
     let opening_res = 0;
     let endgame_res = 0;
-    for (let piece = 0; piece < 6; piece++) {
-        let theboard = copy_bitboard(BOARD[piece]);
-        while (bool_bitboard(theboard)) {
-            let index = pop_lsb_index(theboard);
-            opening_res += piece_val_map(piece, index, 1);
-            endgame_res += piece_val_map(piece, index, 0);
+    for (let p = 0; p < 6; p++) {
+        let bitboard = copy_bitboard(BOARD[p]);
+        while (bool_bitboard(bitboard)) {
+            let index = pop_lsb_index(bitboard);
+            opening_res += piece_values[p] + piece_position_values[p][index];
+            endgame_res += piece_values[p + 6] + piece_position_values[p + 6][index]; 
         }
-        theboard = copy_bitboard(BOARD[piece + 6]);
-        while (bool_bitboard(theboard)) {
-            let index = pop_lsb_index(theboard);
-            opening_res -= piece_val_map(piece + 6, index, 1);
-            endgame_res -= piece_val_map(piece + 6, index, 0);
+        bitboard = copy_bitboard(BOARD[p + 6]);
+        while (bool_bitboard(bitboard)) {
+            let index = pop_lsb_index(bitboard);
+            index += (7 - (index >> 3 << 1)) << 3; // flip rows
+            opening_res -= piece_values[p] + piece_position_values[p][index];
+            endgame_res -= piece_values[p + 6] + piece_position_values[p + 6][index]; 
         }
     }
 
@@ -790,43 +691,62 @@ function evaluate_board() { // LOWER BOUND
     return (TURN) ? -res : res;
 }
 
-function score_move(move, attackers) { // IMPORTANT
+function score_move(move, defenders, max_history) {
     if (score_pv && move == pv_table[0][ply]) {
         score_pv = 0;
-        return 20000; // was determined best move in prev search
+        return 150;
     }
-
+    let res = 0;
     let target = get_move_target(move); 
-    let piece = get_move_piece(move);
-    let piece_type = piece % 6;
+    let piece = get_move_piece(move) % 6;
+
+    let att_piece = is_square_attacked(target, TURN ^ 1);
+    if (att_piece) {
+        if (piece == 5) { return -150; } // moving into check
+
+        if (!defenders && piece) { // piece sacrifice
+            res = (-piece - 8) << 3; 
+        } else if (piece > att_piece - 1 && !(piece == 2 && att_piece - 1 == 1)) { // attacked by lesser piece (not NxB)
+            res = (-piece << 3) + att_piece;
+        }
+    }
 
     if (get_move_capture(move)) {
-        for (let i = 6 * (1 - TURN); i < 6 * (1 - TURN) + 6; i++) {
-            if (get_bit(BOARD[i], target)) {
-                return 10050 - 10 * piece_type + 100 * (i % 6 + 1) + (attackers[target] > 1);
-                // return 10005 - piece_type + 100 * (i %  6 + 1);
+        let cap_piece = 0;
+        for (let i = 0; i < 6; i++) { 
+            if (get_bit(BOARD[6 * (TURN ^ 1) + i], target)) {
+                cap_piece = i;
+                break;
             }
         }
-        // En passant
-        return 10105;
+        if (cap_piece >= piece || (cap_piece == 1 && piece == 2)) { // capturing higher value piece (or BxN)
+            res = 0; // remove att penalties
+        }
+        if (!att_piece) { res += 20; } // free piece
+        return res + 60 + ((cap_piece - piece) << 2);
     }
-    if (move == killer_moves[0][ply]) { return 9000; }
-    if (move == killer_moves[1][ply]) { return 8000; }
-    return Math.min(7000, history_moves[piece][target]); 
+    if (move == killer_moves[0][ply]) { return res + 60; }
+    else if (move == killer_moves[1][ply]) { return res + 55; }
+    return res + history_moves[get_move_piece(move)][target] / max_history * 50; // maps history moves between 0 and 50
+    // return res + Math.min(50, history_moves[get_move_piece(move)][target]);
 }
 
-function order_moves(moves) {
-    let res = [];
+function order_moves(moves, best_move=0) {
+    let max_history = 1;
     let defenders = new Array(64).fill(-1);
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
-        if (!(get_move_piece(move) % 6) && !get_move_capture(move)) { continue; } // ignore pawn pushes
-        defenders[get_move_target(move)] += 1 + (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
+        let piece = get_move_piece(move);
+        let target = get_move_target(move);
+        max_history = Math.max(max_history, history_moves[piece][target]);
+        if (!(piece % 6) && !get_move_capture(move)) { continue; } // ignore pawn pushes
+        defenders[target] += 1 + (piece % 6 ? 0 : 1); // count pawns twice
     }
-
+    let res = [];
     for (let i = 0; i < moves.length; i++) {
-        let entry = [score_move(moves[i], defenders), moves[i]];
-        res.push(entry);
+        let move = moves[i];
+        let score = (move == best_move) ? 160 : score_move(move, defenders[get_move_target(move)], max_history);
+        res.push([score, moves[i]]);
     }
     res.sort(function(a, b) { return b[0] - a[0]; });
     for (let i = 0; i < res.length; i++) {
@@ -841,127 +761,109 @@ function enable_pv_scoring(moves) {
     if (!pv_move) { return; }
     for (let i = 0; i < moves.length; i++) {
         if (moves[i] == pv_move) {
-            follow_pv = 1; score_pv = 1;
-            break;
+            follow_pv = 1;
+            score_pv = 1;
+            return;
         }
     }
 }
 
 // SEARCH -----------------------------------------------------------------------------------------------------------------------------------------------
 
-function best_eval_captures(alpha, beta, depth) {
+function best_eval_captures(depth, alpha, beta) {
     COUNT++;
 
     let stand_pat = evaluate_board();
-    if (ply >= MAX_PLY || depth == 0) {
-        return stand_pat;
-    } else if (stand_pat >= beta) { // beta cutoff
-        return beta;
-    } else if (stand_pat < alpha - 900) { // delta pruning
-        return alpha;
-    } else if (stand_pat > alpha) {
-        alpha = stand_pat;
-    } 
+    if (stand_pat >= beta) { return beta; } // beta cutoff
+    else if (stand_pat < alpha - 900) { return alpha; } // delta pruning
+    else if (stand_pat > alpha) { alpha = stand_pat; }
+    if (depth == 0 || ply > MAX_PLY) {  return stand_pat; }
 
-    let moves = order_moves(generate_capture_moves());
+    let moves = generate_capture_moves();
+    moves = order_moves(moves);
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
 
-        // Copy state
         let cb = copy_board(BOARD);
         let cc = CASTLE;
         let copy_en = EN_PASSANT_SQUARE;
-        let copy_turn = TURN;
-        let copy_hash = copy_bitboard(hash_key);
+        let ch = copy_bitboard(hash_key);
 
-        // Do move
         if (!do_move(move)) {
             continue;
         }
-        
-        ply++;
-        let eval = -best_eval_captures(-beta, -alpha, depth - 1);
-        ply--;
 
-        // Reset state
+        GAME_HASH.push(copy_bitboard(hash_key));
+        ply++;
+        let eval = -best_eval_captures(depth - 1, -beta, -alpha);
+        ply--;
+        GAME_HASH.pop();
+    
         BOARD = cb;
         CASTLE = cc;
         EN_PASSANT_SQUARE = copy_en;
-        TURN = copy_turn;
-        hash_key = copy_hash;
+        TURN ^= 1;
+        hash_key = ch;
 
-        if (eval >= beta) { // Opponent response too stong, snip this move
-            return beta;
-        } 
-        if (eval > alpha) {
-            alpha = eval;
-        }
+        if (eval >= beta) { return beta; }
+        if (eval > alpha) { alpha = eval; }
     }
     return alpha;
 }
 
 function best_eval(depth, alpha, beta) {
     pv_length[ply] = ply;
-    if (ply && is_repetition()) { return 0; } 
 
-    let score = HASH_TABLE.get(depth, alpha, beta);
-    if (ply && !score[0] && score[1] != null) {
+    let best_move = 0;
+    let res = HASH_TABLE.get(depth, alpha, beta);
+    if (res[0]) { best_move = res[1]; }
+    else if (ply && res[1] != null) {
         LOOKUP++;
-        return score[1];
+        return res[1];
     }
 
-    if (depth == 0) { return best_eval_captures(alpha, beta, 8); }
-    if (ply >= MAX_PLY) { return evaluate_board(); }
+    if (depth == 0) { return best_eval_captures(8, alpha, beta); }
+    else if (ply >= MAX_PLY) { return evaluate_board(); }
+
+    let moves = generate_pseudo_moves();
+    if (follow_pv) { enable_pv_scoring(moves); }
+    moves = order_moves(moves, best_move);
 
     COUNT++;
-    let moves = generate_pseudo_moves();
-
-    // Follow pv line
-    if (follow_pv) {
-        enable_pv_scoring(moves);
-    }
-
-    moves = order_moves(moves);
-    let legal_moves = 0; let hash_flag = 2;
+    let hash_flag = 2;
+    let legal_moves = false;
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
 
-        // Copy state
         let cb = copy_board(BOARD);
         let cc = CASTLE;
         let copy_en = EN_PASSANT_SQUARE;
-        let copy_turn = TURN;
-        let copy_hash = copy_bitboard(hash_key);
+        let ch = copy_bitboard(hash_key);
 
-        // Do move
         if (!do_move(move)) {
             continue;
         }
+        legal_moves = true;
 
-        GAME.push(copy_board(BOARD));
         GAME_HASH.push(copy_bitboard(hash_key));
-
-        legal_moves++;
-        ply++
+        ply++;
         let eval = -best_eval(depth - 1, -beta, -alpha);
         ply--;
-
-        GAME.pop();
         GAME_HASH.pop();
 
-        // Reset state
         BOARD = cb;
         CASTLE = cc;
         EN_PASSANT_SQUARE = copy_en;
-        TURN = copy_turn;
-        hash_key = copy_hash;
-        
+        TURN ^= 1;
+        hash_key = ch;
+
         if (eval > alpha) {
+            hash_flag = 1;
             if (!get_move_capture(move)) {
-                history_moves[get_move_piece(move)][get_move_target(move)] += depth * depth;
+                history_moves[get_move_piece(move)][get_move_target(move)] += depth;
             }
             alpha = eval;
-            hash_flag = 1;
+            best_move = move;
 
             pv_table[ply][ply] = move; // write PV move
             for (let next_ply = ply + 1; next_ply < pv_length[ply + 1]; next_ply++) { 
@@ -969,33 +871,28 @@ function best_eval(depth, alpha, beta) {
             }
             pv_length[ply] = pv_length[ply + 1];
 
-            if (eval >= beta) { // Opponent response too stong, snip this move
-                HASH_TABLE.set(depth, 3, eval);
+            if (eval >= beta) { // oppenent response too strong, snip
+                HASH_TABLE.set(depth, 3, eval, best_move);
                 if (!get_move_capture(move)) {
                     killer_moves[1][ply] = killer_moves[0][ply];
                     killer_moves[0][ply] = move;
                 }
                 return beta;
-            }
-        }        
+            } 
+        }
     }
-    
     if (!legal_moves) {
-        let king_pos = lsb_index(BOARD[6 * TURN + 5]);
-
-        if (is_square_attacked(king_pos, TURN ^ 1)) {
+        if (is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
             return -100000 + ply;
         }
         return 0;
     }
-    HASH_TABLE.set(depth, hash_flag, alpha);
+    HASH_TABLE.set(depth, hash_flag, alpha, best_move);
     return alpha;
 }
 
-function search(search_time=2000) {
+function search(search_time=1500) {
     reset_search_tables();
-    COUNT = 0; LOOKUP = 0; ply = 0;
-    follow_pv = 0; score_pv = 0;
 
     let move = book_move();
     if (move) {
@@ -1003,8 +900,10 @@ function search(search_time=2000) {
         pv_table[0][0] = move;
         return [0, 0];
     } 
-    let eval = 0; let start = performance.now(); 
+
+    let eval;
     let depth = 1;
+    let start = performance.now();
     while (performance.now() - start <= search_time) {
         follow_pv = 1;
 
@@ -1017,17 +916,12 @@ function search(search_time=2000) {
         }
         console.log(res);
         if (Math.abs(eval) > 99900) { break; }
-        depth++;        
+        depth++;       
     }
-    if (TURN && PLAYER_WHITE) {
-        eval *= -1;
-    }
-    let end = Math.round(performance.now() - start);
-    if (pv_table[0][0]) {
-        console.log("Best move: " + (get_move_san(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (end));
-    }
+    let time = Math.round(performance.now() - start);
+    console.log("Best move: " + (get_move_san(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (time));
     console.log(" ");
-    return [eval, end];
+    return [eval, time];
 }
 
 // MAIN -----------------------------------------------------------------------------------------------------------------------------------------------
@@ -1036,14 +930,15 @@ let opening_phase = 6192;
 let endgame_phase = 518;
 
 let ply = 0;
-let MAX_PLY = 64;
-let MAX_TIME = 10 * 1000;
+let MAX_PLY = 32;
 
-let killer_moves;; // id, ply
-let history_moves;; // piece, square
+let killer_moves;
+let history_moves;
+
 let pv_length; // ply
 let pv_table; // ply, ply
-let follow_pv; let score_pv;
+let follow_pv;
+let score_pv;
 
 let hash_key;
 let ZOB_TABLE;
