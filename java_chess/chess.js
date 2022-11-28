@@ -46,15 +46,15 @@ function create_move_san(san) {
     let target = square_index(san[number_index - 1] + san[number_index]);
     let piece = is_pawn ? 0 : letters.indexOf(san[0]);
     let promote = san.includes("=") ? letters.indexOf(san[san.length - 1]) : 0;
-    if (TURN) { 
-        piece += 6; 
-        if (promote) { 
-            promote += 6; 
+    if (TURN) {
+        piece += 6;
+        if (promote) {
+            promote += 6;
         }
     }
-    let capture = san.includes("x");
-    let enpassant = capture && !get_bit(BOARD[14], target);
-    let castle = san.includes("-");
+    let capture = san.includes("x") ? 1 : 0;
+    let enpassant = (capture && !get_bit(BOARD[14], target)) ? 1 : 0;
+    let castle = san.includes("-") ? 1 : 0;
 
     let source;
     let bitboard;
@@ -183,7 +183,7 @@ let CASTLING_RIGHTS = [
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
     13, 15, 15, 15, 12, 15, 15, 14
@@ -396,8 +396,7 @@ function do_move(move, ignore_check=false) {
         let promote_piece = get_move_promote(move);
         if (promote_piece == 15) { // reserved for player promote piece
             let input = window.prompt("N B R Q: ").toUpperCase() + " ";
-            input = input[0];
-            let value = "NBRQ".indexOf(input) + 1;
+            let value = "NBRQ".indexOf(input[0]) + 1;
             if (!value) { value = 4; }
             promote_piece = piece + value;
             move = (move & 15794175) | (promote_piece << 16);
@@ -869,14 +868,14 @@ function generate_pseudo_moves() {
     // Castling
     if (CASTLE) {
         let king_pos = TURN ? 4 : 60;
-        if (get_castle_wk(CASTLE) || get_castle_bk(CASTLE)) {
+        if (TURN ? get_castle_bk(CASTLE) : get_castle_wk(CASTLE)) {
             if (!get_bit(BOARD[14], king_pos + 1) && !get_bit(BOARD[14], king_pos + 2)) {
                 if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos + 1, TURN ^ 1)) {
                     moves.push(create_move(king_pos, king_pos + 2, piece, 0, 0, 0, 0, 1));
                 }
             }
         }
-        if (get_castle_wq(CASTLE) || get_castle_bq(CASTLE)) {
+        if (TURN ? get_castle_bq(CASTLE) : get_castle_wq(CASTLE)) {
             if (!get_bit(BOARD[14], king_pos - 1) && !get_bit(BOARD[14], king_pos - 2) && !get_bit(BOARD[14], king_pos - 3)) {
                 if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos - 1, TURN ^ 1)) {
                     moves.push(create_move(king_pos, king_pos - 2, piece, 0, 0, 0, 0, 1));
@@ -1437,9 +1436,8 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
 }
 
 function doAiMove() {
-    let res = search(LOOKAHEAD);
+    let res = search();
     let evaluation = res[0]; 
-    let time = res[1];
 
     let best_move = pv_table[0][0];
     let moves = generate_pseudo_moves();
@@ -1484,26 +1482,6 @@ function doAiMove() {
     document.getElementById("eval-bar").style.height = Math.min(Math.max(56 * Math.tanh(evaluation / 5) + 50, 0), 100) + "%";
 
     if (is_repetition()) { setTimeout(() => {  return finish(); }, 250); }
-
-    if (time == 0) {
-        // book move
-    } else if (time < 750) { // under 0.75s, INCREASE
-        LOOKAHEAD_COUNT = 2;
-    } else if (time < 1500) {
-        LOOKAHEAD_COUNT++;
-    } else if (time > 15000) { // over 15s, DECREASE
-        LOOKAHEAD_COUNT = -2;
-    } else if (time > 7500) {
-        LOOKAHEAD_COUNT--;
-    }
-
-    if (LOOKAHEAD_COUNT >= 2) { // 2 fast moves
-        LOOKAHEAD++;
-        LOOKAHEAD_COUNT = 0;
-    } else if (LOOKAHEAD_COUNT <= -2) { // 2 slow moves
-        LOOKAHEAD--;
-        LOOKAHEAD_COUNT = 0
-    }
     display_board();
     highlightLastMove(best_move);
 
@@ -1516,6 +1494,8 @@ function import_fen() {
         let test_board = make_board(fen);
         if (!test_board || test_board.length == 0) {
             alert("Invalid fen");
+            document.getElementById("stored_fen").value = "";
+            start_game(true);
             return;
         }
         start_game(!TURN, fen);
@@ -1604,13 +1584,12 @@ const daily_puzzle = () => {
 
 // MAIN ----------------------------------------------------------------------------------------------------------------------
 
-function prepare_game(whiteDown, fen, lookahead) {
+function prepare_game(whiteDown, fen) {
     GAME = [];
     GAME_HASH = [];
     GAME_MOVES = [];
 
     PLAYER_WHITE = whiteDown;
-    LOOKAHEAD = lookahead;
     STOCKFISH_ID = "";
 
     make_table();
@@ -1644,13 +1623,13 @@ function prepare_game(whiteDown, fen, lookahead) {
     display_board();
 }
 
-function start_game(whiteDown, fen=START_FEN, lookahead=6) {
+function start_game(whiteDown, fen=START_FEN) {
     let stored_fen = document.getElementById("stored_fen").value;
     if (fen == START_FEN && stored_fen) { fen = stored_fen; }
     if (!fen) { fen = START_FEN; } 
     document.getElementById("stored_fen").value = fen;
 
-    prepare_game(whiteDown, fen, lookahead);
+    prepare_game(whiteDown, fen);
 
     if (!(TURN ^ PLAYER_WHITE)) {
         doAiMove();
@@ -1670,9 +1649,6 @@ let PLAYER_WHITE;
 let TURN; // 0 for player, 1 for ai
 let CASTLE;
 let EN_PASSANT_SQUARE; // pawn moves 2 spots, record position behind pawn
-
-let LOOKAHEAD_COUNT = 0;
-let LOOKAHEAD;
 
 let BOARD;
 let GAME; // for easy undo move

@@ -817,15 +817,15 @@ function score_move(move, attackers) { // IMPORTANT
 
 function order_moves(moves) {
     let res = [];
-    let attackers = new Array(64).fill(0);
+    let defenders = new Array(64).fill(-1);
     for (let i = 0; i < moves.length; i++) {
-        if (get_move_capture(moves[i])) {
-            attackers[get_move_target(moves[i])]++;
-        }
+        let move = moves[i];
+        if (!(get_move_piece(move) % 6) && !get_move_capture(move)) { continue; } // ignore pawn pushes
+        defenders[get_move_target(move)] += 1 + (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
     }
 
     for (let i = 0; i < moves.length; i++) {
-        let entry = [score_move(moves[i], attackers), moves[i]];
+        let entry = [score_move(moves[i], defenders), moves[i]];
         res.push(entry);
     }
     res.sort(function(a, b) { return b[0] - a[0]; });
@@ -940,7 +940,7 @@ function best_eval(depth, alpha, beta) {
 
         GAME.push(copy_board(BOARD));
         GAME_HASH.push(copy_bitboard(hash_key));
-        
+
         legal_moves++;
         ply++
         let eval = -best_eval(depth - 1, -beta, -alpha);
@@ -992,7 +992,7 @@ function best_eval(depth, alpha, beta) {
     return alpha;
 }
 
-function search(depth) {
+function search(search_time=2000) {
     reset_search_tables();
     COUNT = 0; LOOKUP = 0; ply = 0;
     follow_pv = 0; score_pv = 0;
@@ -1003,21 +1003,22 @@ function search(depth) {
         pv_table[0][0] = move;
         return [0, 0];
     } 
-
-    console.log("Lookahead:", depth);
     let eval = 0; let start = performance.now(); 
-    for (let current_depth = 1; current_depth <= depth; current_depth++) {
+    let depth = 1;
+    while (performance.now() - start <= search_time) {
         follow_pv = 1;
 
-        eval = best_eval(current_depth, -Infinity, Infinity);
+        eval = best_eval(depth, -Infinity, Infinity);
+        if (PLAYER_WHITE) { eval *= -1; }
 
-        let res = "Depth: " + (current_depth) + ", analysed: " + (COUNT) + ", eval: " + (eval) + ", PV: ";
+        let res = "Depth: " + (depth) + ", analysed: " + (COUNT) + ", lookup: " + (LOOKUP) + ", eval: " + (eval) + ", PV: ";
         for (let i = 0; i < pv_length[0]; i++) {
             res += get_move_san(pv_table[0][i]) + " ";
         }
         console.log(res);
         if (Math.abs(eval) > 99900) { break; }
-    } 
+        depth++;        
+    }
     if (TURN && PLAYER_WHITE) {
         eval *= -1;
     }

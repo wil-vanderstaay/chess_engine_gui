@@ -175,46 +175,53 @@ function evaluate_board() {
 function score_move(move, defenders) {
     if (score_pv && move == pv_table[0][ply]) {
         score_pv = 0;
-        return 200;
+        return 150;
     }
-
+    let res = 0;
     let target = get_move_target(move); 
-    let piece = get_move_piece(move);
-    let piece_type = piece % 6;
-    
-    // Punish moving to attacked square. Huge punish if moving king, otherwise punish attacked by lower piece
-    let attacked = is_square_attacked(target, TURN ^ 1);
-    let attacked_punish = 0;
-    if (attacked) {
-        if (piece_type == 5) { attacked_punish = 200; }
-        if (piece_type != attacked - 1) { attacked_punish = 6 - attacked; }
+    let piece = get_move_piece(move) % 6;
+
+    let att_piece = is_square_attacked(target, TURN ^ 1);
+    if (att_piece) {
+        if (piece == 5) { return -150; } // moving into check
+
+        if (!defenders && piece) { // piece sacrifice
+            res = (-piece - 8) << 3; 
+        } else if (piece > att_piece - 1 && !(piece == 2 && att_piece - 1 == 1)) { // attacked by lesser piece (not NxB)
+            res = (-piece << 3) + att_piece;
+        }
     }
 
     if (get_move_capture(move)) {
-        let res = 150 + defenders[target] - attacked_punish;
-        for (let i = 0; i < 6; i++) {
-            if (get_bit(BOARD[i + 6 * TURN], target)) {
-                return res + ((i - piece_type) << 1);
+        let cap_piece = 0;
+        for (let i = 0; i < 6; i++) { 
+            if (get_bit(BOARD[6 * (TURN ^ 1) + i], target)) {
+                cap_piece = i;
+                break;
             }
         }
-        return res; // enpassant
+        if (cap_piece >= piece || (cap_piece == 1 && piece == 2)) { // capturing higher value piece (or BxN)
+            res = 0; // remove att penalties
+        }
+        if (!att_piece) { res += 20; } // free piece
+        return res + 60 + ((cap_piece - piece) << 2);
     }
-    if (move == killer_moves[0][ply]) { return 130; }
-    if (move == killer_moves[1][ply]) { return 125; }
-    return Math.min(120, history_moves[piece][target]) - attacked_punish;
+    if (move == killer_moves[0][ply]) { return res + 60; }
+    else if (move == killer_moves[1][ply]) { return res + 55; }
+    return res + Math.min(50, history_moves[get_move_piece(move)][target]);
 }
 
 function order_moves(moves, best_move=0) {
     let defenders = new Array(64).fill(-1);
     for (let i = 0; i < moves.length; i++) {
         let move = moves[i];
-        if (get_move_capture(move)) {
-            defenders[get_move_target(move)] += 1 + (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
-        }
+        if (!(get_move_piece(move) % 6) && !get_move_capture(move)) { continue; } // ignore pawn pushes
+        defenders[get_move_target(move)] += 1 + (get_move_piece(move) % 6 ? 0 : 1); // count pawns twice
     }
     let res = [];
     for (let i = 0; i < moves.length; i++) {
-        let score = (moves[i] == best_move) ? 250 : score_move(moves[i], defenders);
+        let move = moves[i];
+        let score = (move == best_move) ? 160 : score_move(move, defenders[get_move_target(move)]);
         res.push([score, moves[i]]);
     }
     res.sort(function(a, b) { return b[0] - a[0]; });
@@ -345,7 +352,7 @@ function best_eval(depth, alpha, beta) {
                     killer_moves[1][ply] = killer_moves[0][ply];
                     killer_moves[0][ply] = move;
                 }
-                return beta
+                return beta;
             } 
         }
     }
@@ -359,24 +366,26 @@ function best_eval(depth, alpha, beta) {
     return alpha;
 }
 
-function search(depth) {
+function search(search_time=2500) {
     reset_search_tables();
 
-    console.log("Lookahead:", depth);
     let eval;
+    let depth = 1;
     let start = performance.now();
-    for (let current_depth = 1; current_depth <= depth; current_depth++) {
+    for (; depth < 7;) {
+    // while (performance.now() - start <= search_time) {
         follow_pv = 1;
 
-        eval = best_eval(current_depth, -Infinity, Infinity);
+        eval = best_eval(depth, -Infinity, Infinity);
         if (PLAYER_WHITE) { eval *= -1; }
 
-        let res = "Depth: " + (current_depth) + ", analysed: " + (COUNT) + ", lookup: " + (LOOKUP) + ", eval: " + (eval) + ", PV: ";
+        let res = "Depth: " + (depth) + ", analysed: " + (COUNT) + ", lookup: " + (LOOKUP) + ", eval: " + (eval) + ", PV: ";
         for (let i = 0; i < pv_length[0]; i++) {
             res += get_move_san(pv_table[0][i]) + " ";
         }
         console.log(res);
         if (Math.abs(eval) > 99900) { break; }
+        depth++;        
     }
     let time = Math.round(performance.now() - start);
     console.log("Best move: " + (get_move_san(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (time));
