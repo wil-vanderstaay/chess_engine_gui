@@ -40,21 +40,29 @@ function create_move_san(san) {
     san = san.replace("+", "");
     let is_promote = san.includes("=");
     let is_pawn = san[0] != san[0].toUpperCase();
-    let letters = " NBRQK"; // TODO: check if can be lowercase??
+    let letters = " NBRQK";
 
-    let number_index = is_promote ? san.length - 3 : san.length - 1;
-    let target = square_index(san[number_index - 1] + san[number_index]);
-    let piece = is_pawn ? 0 : letters.indexOf(san[0]);
-    let promote = san.includes("=") ? letters.indexOf(san[san.length - 1]) : 0;
+    let target_index = is_promote ? san.length - 4 : san.length - 2;
+    let target;
+    let piece;
+    let castle = san.includes("O") ? 1 : 0;
+    if (castle) {
+        target = TURN ? 2 : 58;
+        if (san.length == 3) { target += 4; }
+        piece = 5;
+    } else {
+        target = square_index(san[target_index] + san[target_index + 1]);
+        piece = is_pawn ? 0 : letters.indexOf(san[0]);
+    }
+    let promote = is_promote ? letters.indexOf(san[san.length - 1]) : 0;
     if (TURN) {
         piece += 6;
-        if (promote) {
-            promote += 6;
+        if (promote) { 
+            promote += 6; 
         }
     }
     let capture = san.includes("x") ? 1 : 0;
     let enpassant = (capture && !get_bit(BOARD[14], target)) ? 1 : 0;
-    let castle = san.includes("-") ? 1 : 0;
 
     let source;
     let bitboard;
@@ -64,6 +72,16 @@ function create_move_san(san) {
                 bitboard = and_bitboards(PAWN_ATTACK[TURN ^ 1][target], BOARD[piece]);
             } else {
                 bitboard = and_bitboards(COL_MASKS[target], BOARD[piece]);
+                if (count_bits(bitboard) != 1) { // disambiguate 2 pawns in same column
+                    let row_back = TURN ? -8 : 8;
+                    if (get_bit(bitboard, target + row_back)) {
+                        bitboard = [0, 0];
+                        set_bit(bitboard, target + row_back);
+                    } else if (get_bit(bitboard, target + (row_back << 1))) {
+                        bitboard = [0, 0];
+                        set_bit(bitboard, target + (row_back << 1));
+                    }
+                }
             }
             break;
         } 
@@ -80,14 +98,26 @@ function create_move_san(san) {
             bitboard = and_bitboards(queen_attack_fly(target, BOARD[14]), BOARD[piece]); break;
         } 
         case 5: { 
-            bitboard = and_bitboards(KING_ATTACK[target], BOARD[piece]); break;
+            if (castle) {
+                bitboard = [0, 0];
+                set_bit(bitboard, san.length == 3 ? target - 2 : target + 2);
+            } else {
+                bitboard = and_bitboards(KING_ATTACK[target], BOARD[piece]);
+            }
+            break;
         }
     }
     if (count_bits(bitboard) == 1) {
         source = lsb_index(bitboard);
-    } else {
-        let mask = isNaN(san[1]) ? COL_MASKS[san[1].charCodeAt() - 97] : ROW_MASKS[parseInt(san[1]) << 3]
-        source = lsb_index(and_bitboards(bitboard, mask));
+    } else { // ambiguous moves eg. Nde2
+        let ambig = is_pawn ? san[0] : san[1];
+        let mask = isNaN(ambig) ? COL_MASKS[ambig.charCodeAt() - 97] : ROW_MASKS[(8 - parseInt(ambig)) << 3];
+        bitboard = and_bitboards(bitboard, mask);
+        if (count_bits(bitboard) == 1) {
+            source = lsb_index(bitboard);
+        } else {
+            source = square_index(san[1] + san[2]); // double ambiguous moves eg. Nb4d5
+        }
     }
     let double = (is_pawn && Math.abs((source >> 3) - (target >> 3)) == 2) ? 1 : 0;
     return create_move(source, target, piece, promote, capture, double, enpassant, castle);
@@ -120,29 +150,32 @@ function get_move_san(move) {
     
     res += letters[piece % 6];
     if (!res && capture) { res += uci[0]; }
-    // Disambiguate moves Nge2
+
+    // Disambiguate moves eg. Nge2 Ng4e5
+    let disamb = [];
     let moves = generate_pseudo_moves();
     for (let i = 0; i < moves.length; i++) {
         let m = moves[i];
         if (m != move && piece % 6 && get_move_piece(m) == piece && get_move_target(m) == target) {
-            let ms = get_move_source(m);
-            if ((ms % 8) == (source % 8)) { res += uci[1]; }
-            else { res += uci[0]; }
-            break;
+            disamb.push(m);
         }
     }
+    let same_row = false; let same_col = false;
+    for (let i = 0; i < disamb.length; i++) {
+        let ms = get_move_source(disamb[i]);
+        if ((ms >> 3) == (source >> 3)) { same_row = true; }    
+        else if ((ms % 8) == (source % 8)) { same_col = true; }   
+    }
+    if (same_col && same_row) { res += uci[0] + uci[1]; } // disamb by square
+    else if (same_row) { res += uci[0]; }
+    else if (same_col) { res += uci[1]; }
+    else if (disamb.length) { res += uci[0]; } // disamb by rows otherwise
+
     if (capture) { res += "x"; }
     res += square_name(target);
     if (promote) { 
         res += "=";
-        if (promote == 15) {
-            for (let i = 0; i < 12; i++) {
-                if (get_bit(BOARD[i], target)) {
-                    res += letters[i % 6];
-                    break;
-                }
-            }
-        } else {
+        if (promote != 15) {
             res += letters[promote % 6]; 
         }
     }    
@@ -1168,8 +1201,7 @@ function make_board(fen) {
     let res = new Array(64).fill(0);
     let split_fen = fen.split(" ");
 
-    if (split_fen.length > 6 || 
-        split_fen.length < 4 || 
+    if (split_fen.length != 6 || 
         split_fen[0].split("/").length != 8 ||
         (!split_fen[1].includes("w") && !split_fen[1].includes("b"))) { return []; }
 
@@ -1198,6 +1230,7 @@ function make_board(fen) {
     if (split_fen[3] != "-") { 
         EN_PASSANT_SQUARE = square_index(split_fen[3]);
     }
+    FIFTY = parseInt(split_fen[4]);
     return create_board(res);
 }
 
@@ -1408,6 +1441,15 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
             }
             let san = get_move_san(move);
             if (do_move(move)) {
+                if (get_move_promote(move) == 15) {
+                    let letters = ["", "N", "B", "R", "Q", "K"];
+                    for (let i = 0; i < 12; i++) {
+                        if (get_bit(BOARD[i], target)) {
+                            san += letters[i % 6];
+                            break;
+                        }
+                    }
+                }
                 GAME.push(copy_board(BOARD));
                 GAME_MOVES.push(san);
                 GAME_HASH.push(copy_bitboard(hash_key));
@@ -1585,7 +1627,6 @@ function prepare_game(whiteDown, fen) {
     GAME_MOVES = [];
 
     PLAYER_WHITE = whiteDown;
-    STOCKFISH_ID = "";
 
     make_table();
     BOARD = make_board(fen);
@@ -1644,6 +1685,7 @@ let PLAYER_WHITE;
 let TURN; // 0 for player, 1 for ai
 let CASTLE;
 let EN_PASSANT_SQUARE; // pawn moves 2 spots, record position behind pawn
+let FIFTY;
 
 let BOARD;
 let GAME; // for easy undo move
@@ -1654,17 +1696,3 @@ initialise_constants();
 
 let tricky_fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
 start_game(true);
-
-/*
-    AI (WHITE) vs AI2 (BLACK)  ->  AI2 has no endgame evaluation
-    BLACK WINS!
-    1. e4 Nc6 2. d4 { B00 Nimzowitsch Defense } e6 3. Bb5 a6 4. Bxc6 bxc6 5. Nf3 Nf6 6. Nbd2 d5 7. e5 Nd7 8. O-O Be7 9. Nb3 Nb6 10. Na5 Bd7 11. Qd3 O-O 12. Be3 Rb8 13. Rac1 Bb4 14. Nb3 Nc4 15. Ng5 g6 16. a3 Be7 17. f4 Nxb2 18. Qxa6 Nc4 19. Rce1 Ra8 20. Qb7 Nxa3 21. Rc1 h6 22. Nf3 Nxc2 23. Rxc2 Rb8 24. Qa6 Rxb3 25. Re1 Re8 26. Nd2 Ra3 27. Qb7 Bh4 28. g3 Be7 29. Nb3 Kh8 30. Nc5 Bxc5 31. Rxc5 Ra2 32. Qb3 Qa8 33. h4 Rb8 34. Qd3 Rbb2 35. f5 Rg2+ 36. Kh1 Rh2+ 37. Kg1 Rag2+ 38. Kf1 Qa2 39. Re2 Rxe2 40. Rc2 Qb1+ 41. Bc1 Rxc2 42. Qxc2 Rxc2 43. fxg6 Qxc1# { Black wins by checkmate. } 0-1
-
-    AI (WHITE) vs AI2 (BLACK)  ->  AI2 only addded delta pruning, increased capture search
-    WHITE WINS!
-    1. e4 Nc6 2. d4 { B00 Nimzowitsch Defense } e6 3. Bb5 a6 4. Bxc6 bxc6 5. Nf3 Nf6 6. Nbd2 d5 7. e5 Nd7 8. O-O Be7 9. Nb3 Nb6 10. Na5 Bd7 11. Qd3 O-O 12. Be3 c5 13. dxc5 Bb5 14. Qc3 Na4 15. Qa3 Bxf1 16. Rxf1 Qe8 17. b4 f6 18. Nd4 fxe5 19. Nxe6 d4 20. Nxc7 Qd7 21. Nxa8 dxe3 22. Qxe3 Rxa8 23. Qb3+ Kh8 24. c6 Qg4 25. Qxa4 Qxb4 26. Qxb4 Bxb4 27. Nc4 Rc8 28. Rb1 a5 29. a3 Bf8 30. Nxa5 Bc5 31. Rb5 Bxa3 32. Nc4 Bf8 33. Nxe5 Kg8 34. Rd5 Ra8 35. g4 Rc8 36. Rd7 Bc5 37. g5 Bb6 38. Kg2 Rf8 39. Nd3 Rc8 40. Ne5 Rf8 41. Nd3 Rc8 42. Nb4 Kf8 43. Rd5 Re8 44. Rb5 Bc7 45. Na6 Rc8 46. Rb7 Ba5 47. Rb5 Bd2 48. c7 Ke7 49. Kf3 h6 50. g6 Bc3 51. Ke4 Kd6 52. Rb8 Kd7 53. Kd5 Rxc7 54. Nxc7 Kxc7 55. Rf8 Kb6 56. h4 Kb5 57. Rb8+ Ka6 58. h5 Ka5 59. f4 Ka6 60. Rc8 Bb2 61. c4 Kb7 62. Rf8 Bc3 63. f5 Ka7 64. f6 Bxf6 65. Rxf6 gxf6 66. g7 f5 67. g8=Q Kb7 68. Kc5 f4 69. Qf7+ Ka8 70. Qg8+ Kb7 71. Qf7+ Ka8 72. Qg8+ Kb7 *
-
-    AI (BLACK) vs AI2 (WHITE)  -> same as above
-    BLACK WINS!
-    1. Nf3 d5 2. d4 Nf6 { D02 Queen's Pawn Game: Symmetrical Variation } 3. Nc3 Nc6 4. Bf4 e6 5. e3 Bb4 6. Bd3 Ne4 7. Bxe4 dxe4 8. Nd2 f5 9. Rf1 O-O 10. Nc4 b6 11. a3 Bxc3+ 12. bxc3 Ba6 13. Ne5 Nxe5 14. Bxe5 Bxf1 15. Kxf1 c5 16. dxc5 Qxd1+ 17. Rxd1 bxc5 18. Rd6 Rad8 19. Rxe6 Rd1+ 20. Ke2 Rfd8 21. Bd4 Rc1 22. Bxc5 Rxc2+ 23. Ke1 Rb8 24. Rd6 Rb1+ 25. Rd1 Rxd1+ 26. Kxd1 Rxf2 27. g3 *
-*/
