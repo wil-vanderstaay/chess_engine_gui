@@ -814,6 +814,8 @@ function best_eval_captures(depth, alpha, beta) {
 function best_eval(depth, alpha, beta) {
     pv_length[ply] = ply;
 
+    if (ply && is_repetition()) { return 0; }
+
     let best_move = 0;
     let res = HASH_TABLE.get(depth, alpha, beta);
     if (res[0]) { best_move = res[1]; }
@@ -893,6 +895,7 @@ function best_eval(depth, alpha, beta) {
 
 function search(search_time=1500) {
     reset_search_tables();
+    if (is_repetition()) { return 0; }
 
     let move = book_move();
     if (move) {
@@ -904,7 +907,7 @@ function search(search_time=1500) {
     let eval;
     let depth = 1;
     let start = performance.now();
-    while (performance.now() - start <= search_time) {
+    while (performance.now() - start <= search_time && depth <= MAX_PLY) {
         follow_pv = 1;
 
         eval = best_eval(depth, -Infinity, Infinity);
@@ -912,14 +915,14 @@ function search(search_time=1500) {
 
         let res = "Depth: " + (depth) + ", analysed: " + (COUNT) + ", lookup: " + (LOOKUP) + ", eval: " + (eval) + ", PV: ";
         for (let i = 0; i < pv_length[0]; i++) {
-            res += get_move_san(pv_table[0][i]) + " ";
+            res += get_move_san(pv_table[0][i], false) + " ";
         }
         console.log(res);
         if (Math.abs(eval) > 99900) { break; }
         depth++;       
     }
     let time = Math.round(performance.now() - start);
-    console.log("Best move: " + (get_move_san(pv_table[0][0])) + ", eval: " + (eval) + ", time (ms): " + (time));
+    console.log("Best move: " + get_move_san(pv_table[0][0], false) + ", eval: " + (eval) + ", time (ms): " + (time));
     console.log(" ");
     return eval;
 }

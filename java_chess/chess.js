@@ -8,7 +8,7 @@ function square_name(index) { return String.fromCharCode(index % 8 + 97) + (8 - 
     0000 0000 0000 0000 0011 1111   source square
     0000 0000 0000 1111 1100 0000   target square
     0000 0000 1111 0000 0000 0000   piece 
-    0000 1111 0000 0000 0000 0000   promoted piece 
+    0000 1111 0000 0000 0000 0000   promoted piece
     0001 0000 0000 0000 0000 0000   capture flag
     0010 0000 0000 0000 0000 0000   double push flag
     0100 0000 0000 0000 0000 0000   enpassant flag
@@ -131,11 +131,13 @@ function get_move_double(move) { return (move & 2097152) >> 21; }
 function get_move_enpassant(move) { return (move & 4194304) >> 22; }
 function get_move_castle(move) { return (move & 8388608) >> 23; }
 function get_move_uci(move) { 
+    if (!move) { return ""; }
     let letters = " nbrq";
     let promote = get_move_promote(move) % 6;
     return square_name(get_move_source(move)) + square_name(get_move_target(move)) + (promote ? letters[promote] : ""); 
 }
-function get_move_san(move) { 
+function get_move_san(move, disambiguate=true) { 
+    if (!move) { return ""; }
     let uci = get_move_uci(move);
 
     let res = "";
@@ -151,25 +153,26 @@ function get_move_san(move) {
     res += letters[piece % 6];
     if (!res && capture) { res += uci[0]; }
 
-    // Disambiguate moves eg. Nge2 Ng4e5
-    let disamb = [];
-    let moves = generate_pseudo_moves();
-    for (let i = 0; i < moves.length; i++) {
-        let m = moves[i];
-        if (m != move && piece % 6 && get_move_piece(m) == piece && get_move_target(m) == target) {
-            disamb.push(m);
+    if (disambiguate) {
+        let disamb = [];
+        let moves = generate_pseudo_moves();
+        for (let i = 0; i < moves.length; i++) {
+            let m = moves[i];
+            if (m != move && piece % 6 && get_move_piece(m) == piece && get_move_target(m) == target) {
+                disamb.push(m);
+            }
         }
+        let same_row = false; let same_col = false;
+        for (let i = 0; i < disamb.length; i++) {
+            let ms = get_move_source(disamb[i]);
+            if ((ms >> 3) == (source >> 3)) { same_row = true; }    
+            else if ((ms % 8) == (source % 8)) { same_col = true; }   
+        }
+        if (same_col && same_row) { res += uci[0] + uci[1]; } // disamb by square
+        else if (same_row) { res += uci[0]; }
+        else if (same_col) { res += uci[1]; }
+        else if (disamb.length) { res += uci[0]; } // disamb by rows otherwise
     }
-    let same_row = false; let same_col = false;
-    for (let i = 0; i < disamb.length; i++) {
-        let ms = get_move_source(disamb[i]);
-        if ((ms >> 3) == (source >> 3)) { same_row = true; }    
-        else if ((ms % 8) == (source % 8)) { same_col = true; }   
-    }
-    if (same_col && same_row) { res += uci[0] + uci[1]; } // disamb by square
-    else if (same_row) { res += uci[0]; }
-    else if (same_col) { res += uci[1]; }
-    else if (disamb.length) { res += uci[0]; } // disamb by rows otherwise
 
     if (capture) { res += "x"; }
     res += square_name(target);
@@ -930,19 +933,19 @@ function generate_capture_moves() {
 }
 
 function finish() {
-    let message = "Stalemate";
-    if (is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
-        message = "Checkmate. " + (TURN ? "White" : "Black") + " wins";
-    } else {
-        let moves = generate_pseudo_moves();
-        for (let i = 0; i < moves.length; i++) {
-            if (do_move(moves[i])) {
-                message = "Threefold repetition";
-                break;
-            }
+    let index = 0;
+    let moves = generate_pseudo_moves();
+    for (let i = 0; i < moves.length; i++) {
+        if (do_move(moves[i])) {
+            index = 1;
+            break;
         }
     }
-    setTimeout(() => { alert(message); }, 250);
+    if (!index && is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
+        index = 2;
+    }
+    let outcomes = ["Draw by stalemate", "Draw by threefold repetition", "Checkmate. " + (TURN ? "White" : "Black") + " wins"];
+    setTimeout(() => { alert(outcomes[index]); }, 250);
 }
 
 function opponent_att_mask() {
@@ -981,10 +984,6 @@ function opponent_att_mask() {
     piece++;
     piece_board = copy_bitboard(BOARD[piece]);
     return or_bitboards(res, KING_ATTACK[pop_lsb_index(piece_board)]);
-}
-
-function is_repetition() {
-    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 3;
 }
 
 // HTML ----------------------------------------------------------------------------------------------------------------------
@@ -1039,7 +1038,13 @@ function add_piece() {
     }
 }
 
+function randint(n) { return Math.floor(Math.random() * n); } // random 0..n
+
 function play_rand_endgame(book) {
+    let book_endgames = [
+        "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0", // BN
+        "6k1/8/8/8/8/8/8/4BBK1 w - - 0 0", // BB
+    ];
     let endgames = [
         ["6k1/5p2/6p1/8/7p/8/6PP/6K1 b - - 0 0", "Black"], // 3p vs 2p
         ["3k4/2n2B2/1KP5/2B2p2/5b1p/7P/8/8 b - - 0 0", "White"], // 2B vs BN
@@ -1068,18 +1073,9 @@ function play_rand_endgame(book) {
         ["8/5k2/4p2p/4P3/B1np1KP1/3b4/8/2B5 b - - 0 1", "Equal"], // B+N vs. 2B         #25
         ["8/1p4p1/5p1p/1k3P2/6PP/3KP3/8/8 w - - 0 50", "White"], // K+P
         ["8/8/1p1k4/5ppp/PPK1p3/6P1/5PP1/8 b - - 0 0", "Black"], // K+P
-    ]
-    let index = Math.floor(Math.random() * endgames.length);
-    let fen = endgames[index][0];
-    if (book) { fen = "6k1/8/8/8/8/8/8/4BNK1 w - - 0 0"; } // BN vs K 
-    i = 0;
-    while (i < fen.length) {
-        if (fen[i] == " ") {
-            PLAYER_WHITE = fen[i + 1] == "w";
-            break;
-        }
-        i++;
-    }
+    ];
+    let fen = book ? book_endgames[randint(book_endgames.length)] : endgames[randint(endgames.length)][0];
+    PLAYER_WHITE = fen.split(" ")[1] == "w";
     document.getElementById("stored_fen").value = "";
     start_game(PLAYER_WHITE, fen, 8);
 }
@@ -1087,14 +1083,14 @@ function play_rand_endgame(book) {
 function undo_move() {
     GAME.pop();
     GAME.pop();
+    if (!GAME.length) { return start_game(PLAYER_WHITE); }
+
+    GAME_MOVES.pop();
+    GAME_MOVES.pop();
+    GAME_HASH.pop();
+    GAME_HASH.pop();
+    hash_key = copy_bitboard(GAME_HASH[GAME_HASH.length - 1]);
     BOARD = GAME[GAME.length - 1];
-    if (!BOARD) { return start_game(PLAYER_WHITE); }
-
-    GAME_MOVES.pop();
-    GAME_MOVES.pop();
-    GAME_HASH.pop();
-    GAME_HASH.pop();
-
     display_board();
 }
 
