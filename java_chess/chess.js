@@ -282,31 +282,31 @@ function pop_bit(bitboard, i) {
     return bit;
 }
 
-function count_number_bits(number) {
+function count_bits_number(number) {
 	number -= (number >>> 1) & 0x55555555;
 	number = (number & 0x33333333) + ((number >>> 2) & 0x33333333);
 	return ((number + (number >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
 }
 function count_bits(bitboard) {
-    return count_number_bits(bitboard[0]) + count_number_bits(bitboard[1]);
+    return count_bits_number(bitboard[0]) + count_bits_number(bitboard[1]);
 }
 
-function lsb_number_index(number) {
-    return count_number_bits((number & -number) - 1);
+function lsb_index_number(number) {
+    return count_bits_number((number & -number) - 1);
 }
 function lsb_index(bitboard) {
     if (bitboard[0]) {
-        return lsb_number_index(bitboard[0]);
+        return lsb_index_number(bitboard[0]);
     }
-    return 32 + lsb_number_index(bitboard[1]);
+    return 32 + lsb_index_number(bitboard[1]);
 }
 function pop_lsb_index(bitboard) {
     let index;
     if (bitboard[0]) {
-        index = lsb_number_index(bitboard[0]);
+        index = lsb_index_number(bitboard[0]);
         bitboard[0] &= bitboard[0] - 1;
     } else {
-        index = 32 + lsb_number_index(bitboard[1]);
+        index = 32 + lsb_index_number(bitboard[1]);
         bitboard[1] &= bitboard[1] - 1;
     }
     return index;

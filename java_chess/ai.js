@@ -893,7 +893,7 @@ function best_eval(depth, alpha, beta) {
     return alpha;
 }
 
-function search(search_time=1500) {
+function search(search_time=750, override_depth=0) {
     reset_search_tables();
     if (is_repetition()) { return 0; }
 
@@ -907,7 +907,7 @@ function search(search_time=1500) {
     let eval;
     let depth = 1;
     let start = performance.now();
-    while (performance.now() - start <= search_time && depth <= MAX_PLY) {
+    while ((performance.now() - start <= search_time || depth <= override_depth) && depth <= MAX_PLY) {
         follow_pv = 1;
 
         eval = best_eval(depth, -Infinity, Infinity);
@@ -917,13 +917,15 @@ function search(search_time=1500) {
         for (let i = 0; i < pv_length[0]; i++) {
             res += get_move_san(pv_table[0][i], false) + " ";
         }
-        console.log(res);
+        if (!override_depth) { console.log(res); }
         if (Math.abs(eval) > 99900) { break; }
         depth++;       
     }
     let time = Math.round(performance.now() - start);
-    console.log("Best move: " + get_move_san(pv_table[0][0], false) + ", eval: " + (eval) + ", time (ms): " + (time));
-    console.log(" ");
+    if (!override_depth) {
+        console.log("Best move: " + get_move_san(pv_table[0][0], false) + ", eval: " + (eval) + ", time (ms): " + (time));
+        console.log(" ");
+    }
     return eval;
 }
 
