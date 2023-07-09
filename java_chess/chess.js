@@ -1,5 +1,5 @@
 function square_index(name) { return name[0].charCodeAt() - (parseInt(name[1]) << 3) - 33; }
-function square_name(index) { return String.fromCharCode(index % 8 + 97) + (8 - (index >> 3)) }
+function square_name(index) { return String.fromCharCode((index & 7) + 97) + (8 - (index >> 3)) }
 
 // MOVE ----------------------------------------------------------------------------------------------------------------------
 /* 
@@ -31,9 +31,9 @@ function create_move_uci(uci) {
     let promote = 0;
     if (uci.length == 5) { promote = letters.indexOf(uci[4]) + 6 * TURN; }
     let double = !(piece % 6) && Math.abs((source >> 3) - (target >> 3)) == 2;
-    let enpassant = !(piece % 6) && Math.abs((source % 8) - (target % 8)) == 1 && !get_bit(BOARD[14], target);
+    let enpassant = !(piece % 6) && Math.abs((source & 7) - (target & 7)) == 1 && !get_bit(BOARD[14], target);
     let capture = (enpassant || get_bit(BOARD[14], target)) ? 1 : 0;
-    let castle = piece % 6 == 5 && Math.abs((source % 8) - (target % 8)) == 2;
+    let castle = piece % 6 == 5 && Math.abs((source & 7) - (target & 7)) == 2;
     return create_move(source, target, piece, promote, capture, double, enpassant, castle);
 }
 function create_move_san(san) {
@@ -166,7 +166,7 @@ function get_move_san(move, disambiguate=true) {
         for (let i = 0; i < disamb.length; i++) {
             let ms = get_move_source(disamb[i]);
             if ((ms >> 3) == (source >> 3)) { same_row = true; }    
-            else if ((ms % 8) == (source % 8)) { same_col = true; }   
+            else if ((ms & 7) == (source & 7)) { same_col = true; }   
         }
         if (same_col && same_row) { res += uci[0] + uci[1]; } // disamb by square
         else if (same_row) { res += uci[0]; }
@@ -257,11 +257,11 @@ function nand_bitboards(bitboard1, bitboard2) {
     return [bitboard1[0] & ~bitboard2[0], bitboard1[1] & ~bitboard2[1]]
 }
 
-function get_bit(bitboard, i) { return bitboard[+(i >= 32)] & (1 << i); }
-function set_bit(bitboard, i) { bitboard[+(i >= 32)] |= (1 << i); }
+function get_bit(bitboard, i) { return (bitboard[+(i >= 32)] & (1 << (i & 31))) ? 1 : 0; }
+function set_bit(bitboard, i) { bitboard[+(i >= 32)] |= (1 << (i & 31)); }
 function pop_bit(bitboard, i) {
     let bit = get_bit(bitboard, i);
-    if (bit) { bitboard[+(i >= 32)] ^= (1 << i); }
+    if (bit) { bitboard[+(i >= 32)] ^= (1 << (i & 31)); }
     return bit;
 }
 
@@ -339,12 +339,8 @@ function create_board(board) { // board is a 64-length list containing piece val
     return res;
 }
 
-function copy_board(board) {
-    let res = [];
-    for (let i = 0; i < board.length; i++) {
-        res.push(copy_bitboard(board[i]));
-    }
-    return res;
+function copy_board() {
+    return [copy_bitboard(BOARD[0]), copy_bitboard(BOARD[1]), copy_bitboard(BOARD[2]), copy_bitboard(BOARD[3]), copy_bitboard(BOARD[4]), copy_bitboard(BOARD[5]), copy_bitboard(BOARD[6]), copy_bitboard(BOARD[7]), copy_bitboard(BOARD[8]), copy_bitboard(BOARD[9]), copy_bitboard(BOARD[10]), copy_bitboard(BOARD[11]), copy_bitboard(BOARD[12]), copy_bitboard(BOARD[13]), copy_bitboard(BOARD[14])];
 }
 
 function legal_move(pos, new_pos) { // determine if moving from pos to new_pos is a possible move
@@ -528,6 +524,7 @@ class HashTable { // store score of positions previously explored at certain dep
         entry.move = move;
 
         let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
+        if (this.hashes[key] != null) { HASH_OVERWRITES++; } 
         this.hashes[key] = entry;
     }
 }
@@ -601,14 +598,14 @@ function initialise_constants() { // attack masks for pawns knights kings from a
         let res = [new Array(64), new Array(64)];
         for (let i = 0; i < 64; i++) { // player
             let board = [0, 0];           
-            let col = i % 8;
+            let col = i & 7;
             if (8 < i && 0 < col) { set_bit(board, i - 9); }
             if (6 < i && col < 7) { set_bit(board, i - 7); }
             res[0][i] = board;
         }
         for (let i = 0; i < 64; i++) { // ai
             let board = [0, 0]
-            let col = i % 8;
+            let col = i & 7;
             if (i < 57 && 0 < col) { set_bit(board, i + 7); }
             if (i < 55 && col < 7) { set_bit(board, i + 9); }
             res[1][i] = board;
@@ -678,28 +675,29 @@ function initialise_constants() { // attack masks for pawns knights kings from a
 
 function bishop_attack_fly(square, blocker) {
     let res = [0, 0];
-    let r = square >> 3; let c = square % 8;
+    let r = square >> 3; let c = square & 7;
     let o = 1;
+    let i;
     while (r + o < 8 && c + o < 8) { // + +
-        let i = square + 9 * o;
+        i = square + 9 * o;
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
     o = 1;
     while (r + o < 8 && 0 <= c - o) { // + -
-        let i = square + 7 * o;
+        i = square + 7 * o;
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
     o = 1;
     while (0 <= r - o && c + o < 8) { // - +
-        let i = square - 7 * o;
+        i = square - 7 * o;
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
     o = 1;
     while (0 <= r - o && 0 <= c - o) { // - -
-        let i = square - 9 * o;
+        i = square - 9 * o;
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
@@ -707,28 +705,29 @@ function bishop_attack_fly(square, blocker) {
 }
 function rook_attack_fly(square, blocker) {
     let res = [0, 0];
-    let r = square >> 3; let c = square % 8;
+    let r = square >> 3; let c = square & 7;
     let o = 1;
+    let i;
     while (r + o < 8) { // + .
-        let i = square + (o << 3);
+        i = square + (o << 3);
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
     o = 1;
     while (0 <= r - o) { // - .
-        let i = square - (o << 3);
+        i = square - (o << 3);
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
     o = 1;
     while (c + o < 8) { // . +
-        let i = square + o;
+        i = square + o;
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
     o = 1;
     while (0 <= c - o) { // . -
-        let i = square - o;
+        i = square - o;
         set_bit(res, i); o++;
         if (get_bit(blocker, i)) { break; }
     }
@@ -742,10 +741,6 @@ function queen_attack_fly(square, blocker) {
 
 function is_square_attacked(square, side) {
     let att_piece = side * 6;
-    // Attacked by white pawns
-    if (!side && bool_bitboard(and_bitboards(PAWN_ATTACK[1][square], BOARD[0]))) { return 1; }
-    // Attacked by black pawns
-    if (side && bool_bitboard(and_bitboards(PAWN_ATTACK[0][square], BOARD[6]))) { return 1; }
     // Attacked by knights
     if (bool_bitboard(and_bitboards(KNIGHT_ATTACK[square], BOARD[att_piece + 1]))) { return 2; }
     // Attacked by bishops
@@ -754,6 +749,8 @@ function is_square_attacked(square, side) {
     if (bool_bitboard(and_bitboards(rook_attack_fly(square, BOARD[14]), BOARD[att_piece + 3]))) { return 4; }
     // Attacked by queens
     if (bool_bitboard(and_bitboards(queen_attack_fly(square, BOARD[14]), BOARD[att_piece + 4]))) { return 5; }
+    // Attacked by pawns
+    if (bool_bitboard(and_bitboards(PAWN_ATTACK[side ^ 1][square], BOARD[att_piece]))) { return 1; }
     // Attacked by kings
     if (bool_bitboard(and_bitboards(KING_ATTACK[square], BOARD[att_piece + 5]))) { return 6; }
     
@@ -886,19 +883,11 @@ function generate_pseudo_moves() {
     // Castling
     if (CASTLE) {
         let king_pos = TURN ? 4 : 60;
-        if (TURN ? get_castle_bk(CASTLE) : get_castle_wk(CASTLE)) {
-            if (!get_bit(BOARD[14], king_pos + 1) && !get_bit(BOARD[14], king_pos + 2)) {
-                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos + 1, TURN ^ 1)) {
-                    moves.push(create_move(king_pos, king_pos + 2, piece, 0, 0, 0, 0, 1));
-                }
-            }
+        if ((TURN ? get_castle_bk(CASTLE) : get_castle_wk(CASTLE)) && !get_bit(BOARD[14], king_pos + 1) && !get_bit(BOARD[14], king_pos + 2) && !is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos + 1, TURN ^ 1)) {
+            moves.push(create_move(king_pos, king_pos + 2, piece, 0, 0, 0, 0, 1));
         }
-        if (TURN ? get_castle_bq(CASTLE) : get_castle_wq(CASTLE)) {
-            if (!get_bit(BOARD[14], king_pos - 1) && !get_bit(BOARD[14], king_pos - 2) && !get_bit(BOARD[14], king_pos - 3)) {
-                if (!is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos - 1, TURN ^ 1)) {
-                    moves.push(create_move(king_pos, king_pos - 2, piece, 0, 0, 0, 0, 1));
-                }
-            }
+        if ((TURN ? get_castle_bq(CASTLE) : get_castle_wq(CASTLE)) && !get_bit(BOARD[14], king_pos - 1) && !get_bit(BOARD[14], king_pos - 2) && !get_bit(BOARD[14], king_pos - 3) && !is_square_attacked(king_pos, TURN ^ 1) && !is_square_attacked(king_pos - 1, TURN ^ 1)) {
+            moves.push(create_move(king_pos, king_pos - 2, piece, 0, 0, 0, 0, 1));
         }
     }
     return moves;
@@ -1243,7 +1232,7 @@ function display_board() {
     width = s.right - s.left;
 
     for (let i = 0; i < 64; i++) {
-        let piece_location = table.rows.item(i >> 3).cells.item(i % 8);
+        let piece_location = table.rows.item(i >> 3).cells.item(i & 7);
         piece_location.style.background = "";
         piece_location.innerHTML = remove_img_div(piece_location.innerHTML);
         
@@ -1279,8 +1268,8 @@ function highlightLastMove(last_move) {
         move_target = 63 - move_target;
     }
 
-    let s_location = table.rows.item(move_source >> 3).cells.item(move_source % 8);
-    let t_location = table.rows.item(move_target >> 3).cells.item(move_target % 8);
+    let s_location = table.rows.item(move_source >> 3).cells.item(move_source & 7);
+    let t_location = table.rows.item(move_target >> 3).cells.item(move_target & 7);
 
     s_location.style.background = (s_location.className == "light") ? lcode : dcode;
     t_location.style.background = (t_location.className == "light") ? lcode : dcode;
@@ -1302,7 +1291,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         // Reset board colours
         let table = document.getElementById("chess-table");
         for (let i = 0; i < 64; i++) {
-            let piece_location = table.rows.item(i >> 3).cells.item(i % 8);
+            let piece_location = table.rows.item(i >> 3).cells.item(i & 7);
             if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
                 piece_location.style.background = "";
             }
@@ -1368,7 +1357,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         if (SELECTED_PIECE == pos) { return; } // remove selection
 
          // Highlight piece
-         let piece_location = table.rows.item(pos >> 3).cells.item(pos % 8);
+         let piece_location = table.rows.item(pos >> 3).cells.item(pos & 7);
          piece_location.style.background = (piece_location.className == "light") ? "#bbe0ae" : "#75c15b";
 
         // Determine legal piece moves
@@ -1382,14 +1371,14 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
 
         // Add onclick for doing nothing
         for (let i = 0; i < 64; i++) {
-            let cell = table.rows.item(i >> 3).cells.item(i % 8);
+            let cell = table.rows.item(i >> 3).cells.item(i & 7);
             if (i == pos) { continue; }
             cell.onclick = function() {
                 SELECTED_PIECE = 64;
                 if (get_bit(BOARD[14], i)) { SELECTED_PIECE = i; }
                 // Reset board colours
                 for (let j = 0; j < 64; j++) {
-                    let piece_location = table.rows.item(j >> 3).cells.item(j % 8);
+                    let piece_location = table.rows.item(j >> 3).cells.item(j & 7);
                     if (piece_location.style.background != "rgb(184, 226, 242)" && piece_location.style.background != "rgb(119, 195, 236)") { // leave blue cells
                         piece_location.style.background = (piece_location.className == "light") ? "#f1d9c0" : "#a97a65";
                     }
@@ -1401,7 +1390,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
         // Add onclick for legal piece moves
         for (let i = 0; i < move_targets.length; i++) {
             let target = move_targets[i];
-            let move_location = table.rows.item(target >> 3).cells.item(target % 8);
+            let move_location = table.rows.item(target >> 3).cells.item(target & 7);
 
             move_location.onclick = function() {
                 SELECTED_PIECE = 64;
@@ -1443,7 +1432,7 @@ function pieceDrag(div, pos, pieceTurn, move_anywhere=false) {
                 return true;
             }
             let king_pos = lsb_index(BOARD[TURN ? 11 : 5]);
-            let king_location = document.getElementById("chess-table").rows.item(king_pos >> 3).cells.item(king_pos % 8);
+            let king_location = document.getElementById("chess-table").rows.item(king_pos >> 3).cells.item(king_pos & 7);
             king_location.style.background = "#FF0000"; // RED
             setTimeout(() => {
                 king_location.style.background = "";
@@ -1670,6 +1659,8 @@ let BOARD;
 let GAME; // for easy undo move
 let GAME_HASH;
 let GAME_MOVES;
+
+let HASH_OVERWRITES = 0;
 
 initialise_constants();
 

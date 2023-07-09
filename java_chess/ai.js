@@ -1,6 +1,7 @@
 function reset_search_tables() {
     COUNT = 0; 
     LOOKUP = 0;
+    HASH_OVERWRITES = 0;
     ply = 0;
     follow_pv = 0; 
     score_pv = 0;
@@ -523,7 +524,7 @@ function book_move() {
     let move = "";
     let i = game_so_far.length;
     while (game[i].toLowerCase() == game[i].toUpperCase()) {
-        i += 1
+        i++;
     }
     while (i < game.length) {
         if (game[i] == " ") { break; }
@@ -652,14 +653,7 @@ let piece_position_values = [
     ]
 ];
 
-function get_gamephase_score() {
-    let res = 0;
-    for (let i = 1; i < 5; i++) {
-        res += count_bits(BOARD[i]) * piece_values[i];
-        res += count_bits(BOARD[i + 6]) * piece_values[i];
-    }
-    return res;
-}
+function get_gamephase_score() { return count_bits(BOARD[1]) * piece_values[1] + count_bits(BOARD[2]) * piece_values[2] + count_bits(BOARD[3]) * piece_values[3] + count_bits(BOARD[4]) * piece_values[4] + count_bits(BOARD[7]) * piece_values[7] + count_bits(BOARD[8]) * piece_values[8] + count_bits(BOARD[9]) * piece_values[9] + count_bits(BOARD[10]) * piece_values[10]; }
 
 function evaluate_board() {
     let opening_res = 0;
@@ -812,8 +806,6 @@ function best_eval_captures(depth, alpha, beta) {
 }
 
 function best_eval(depth, alpha, beta) {
-    pv_length[ply] = ply;
-
     if (ply && is_repetition()) { return 0; }
 
     let best_move = 0;
@@ -824,6 +816,7 @@ function best_eval(depth, alpha, beta) {
         return res[1];
     }
 
+    pv_length[ply] = ply;
     if (depth == 0) { return best_eval_captures(8, alpha, beta); }
     else if (ply >= MAX_PLY) { return evaluate_board(); }
 
@@ -913,17 +906,17 @@ function search(search_time=750, override_depth=0) {
         eval = best_eval(depth, -Infinity, Infinity);
         if (PLAYER_WHITE) { eval *= -1; }
 
-        let res = "Depth: " + (depth) + ", analysed: " + (COUNT) + ", lookup: " + (LOOKUP) + ", eval: " + (eval) + ", PV: ";
+        let res = "Depth: " + (depth) + ", analysed: " + (COUNT) + ", lookup: " + (LOOKUP) + ", eval: " + (eval) + ", hash overwrites: " + (HASH_OVERWRITES) + ", PV: ";
+        let PV = "";
         for (let i = 0; i < pv_length[0]; i++) {
-            res += get_move_san(pv_table[0][i], false) + " ";
+            PV += get_move_san(pv_table[0][i], false) + " ";
         }
-        if (!override_depth) { console.log(res); }
-        if (Math.abs(eval) > 99900) { break; }
-        depth++;       
+        if (!override_depth) { console.log(res + PV); }
+        depth++; 
     }
     let time = Math.round(performance.now() - start);
     if (!override_depth) {
-        console.log("Best move: " + get_move_san(pv_table[0][0], false) + ", eval: " + (eval) + ", time (ms): " + (time));
+        console.log("Best move: %s\tEval: %d\tTime (ms): %d\tHash size: %d", get_move_san(pv_table[0][0], false), eval, time, Object.keys(HASH_TABLE.hashes).length);
         console.log(" ");
     }
     return eval;
@@ -959,6 +952,16 @@ function perft(depth, print=1) {
     return res;
 }
 
+function id_perft(depth) {
+    let res;
+    let start = performance.now();
+    for (let i = 1; i <= depth; i++) {
+        res = perft(i, i == depth);
+    }
+    let time = performance.now() - start
+    console.log("Nodes: %d\tTime: %d\tNodes per sec: %d", res, time, res / time * 1000);
+}
+
 function do_perft(depth) {
     let start = performance.now();
     let res = perft(depth);
@@ -985,7 +988,7 @@ let score_pv;
 let hash_key;
 let ZOB_TABLE;
 let HASH_TABLE;
-let HASH_SIZE = 67108864;
+let HASH_SIZE = 4194304;
 
 let COUNT = 0;
 let LOOKUP = 0;
