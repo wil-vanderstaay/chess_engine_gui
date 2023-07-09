@@ -257,28 +257,11 @@ function nand_bitboards(bitboard1, bitboard2) {
     return [bitboard1[0] & ~bitboard2[0], bitboard1[1] & ~bitboard2[1]]
 }
 
-function get_bit(bitboard, i) {
-    if (i < 32) { 
-        return bitboard[0] & (1 << i); 
-    }
-    return bitboard[1] & (1 << i);
-}
-function set_bit(bitboard, i) {
-    if (i < 32) {
-        bitboard[0] |= (1 << i);
-    } else {
-        bitboard[1] |= (1 << i);
-    }
-}
+function get_bit(bitboard, i) { return bitboard[+(i >= 32)] & (1 << i); }
+function set_bit(bitboard, i) { bitboard[+(i >= 32)] |= (1 << i); }
 function pop_bit(bitboard, i) {
     let bit = get_bit(bitboard, i);
-    if (bit) {
-        if (i < 32) {
-            bitboard[0] ^= (1 << i); 
-        } else {
-            bitboard[1] ^= (1 << i); 
-        }
-    }
+    if (bit) { bitboard[+(i >= 32)] ^= (1 << i); }
     return bit;
 }
 

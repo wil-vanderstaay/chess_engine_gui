@@ -929,6 +929,43 @@ function search(search_time=750, override_depth=0) {
     return eval;
 }
 
+function perft(depth, print=1) {
+    if (depth == 0) { return 1; }
+    
+    let res = 0;
+    let moves = generate_pseudo_moves();
+    for (let i = 0; i < moves.length; i++) {
+        let cb = copy_board(BOARD);
+        let cc = CASTLE;
+        let copy_en = EN_PASSANT_SQUARE;
+        let ch = copy_bitboard(hash_key);
+        if (!do_move(moves[i])) {
+            continue;
+        }
+        
+        let start_res = res;
+        res += perft(depth - 1, 0);   
+
+        if (print) {
+            console.log("%s\t->\t%d", get_move_uci(moves[i]), res - start_res);
+        }
+
+        BOARD = cb;
+        CASTLE = cc;
+        EN_PASSANT_SQUARE = copy_en;
+        TURN ^= 1;
+        hash_key = ch;
+    }
+    return res;
+}
+
+function do_perft(depth) {
+    let start = performance.now();
+    let res = perft(depth);
+    let time = performance.now() - start
+    console.log("Nodes: %d\tTime: %d\tNodes per sec: %d", res, time, res / time * 1000);
+}
+
 // MAIN -----------------------------------------------------------------------------------------------------------------------------------------------
 
 let opening_phase = 6192;
