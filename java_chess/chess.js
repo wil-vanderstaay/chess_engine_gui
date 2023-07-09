@@ -585,12 +585,14 @@ function initialise_constants() { // attack masks for pawns knights kings from a
 
     ROW_MASKS = new Array(64); 
     COL_MASKS = new Array(64);
+    CENTRE_MANHATTAN = new Array(64);
     for (let i = 0; i < 8; i++) {
         let row = set_row_col_mask(i, -1);
         let col = set_row_col_mask(-1, i);
         for (let j = 0; j < 8; j++) {
             ROW_MASKS[(i << 3) + j] = row;
             COL_MASKS[(j << 3) + i] = col;
+            CENTRE_MANHATTAN[(i << 3) + j] = Math.max(3 - i, i - 4) + Math.max(3 - j, j - 4);
         }
     }
 
@@ -1648,6 +1650,7 @@ let KING_ATTACK;
 
 let ROW_MASKS; 
 let COL_MASKS;
+let CENTRE_MANHATTAN;
 
 let PLAYER_WHITE;
 let TURN; // 0 for player, 1 for ai

@@ -658,21 +658,27 @@ function get_gamephase_score() { return count_bits(BOARD[1]) * piece_values[1] +
 function evaluate_board() {
     let opening_res = 0;
     let endgame_res = 0;
+    let bitboard;
+    let index;
     for (let p = 0; p < 6; p++) {
-        let bitboard = copy_bitboard(BOARD[p]);
+        bitboard = copy_bitboard(BOARD[p]);
         while (bool_bitboard(bitboard)) {
-            let index = pop_lsb_index(bitboard);
+            index = pop_lsb_index(bitboard);
             opening_res += piece_values[p] + piece_position_values[p][index];
             endgame_res += piece_values[p + 6] + piece_position_values[p + 6][index]; 
         }
         bitboard = copy_bitboard(BOARD[p + 6]);
         while (bool_bitboard(bitboard)) {
-            let index = pop_lsb_index(bitboard);
+            index = pop_lsb_index(bitboard);
             index += (7 - (index >> 3 << 1)) << 3; // flip rows
             opening_res -= piece_values[p] + piece_position_values[p][index];
             endgame_res -= piece_values[p + 6] + piece_position_values[p + 6][index]; 
         }
     }
+
+    // Endgame active king
+    endgame_res += CENTRE_MANHATTAN[lsb_index(BOARD[5])] << 3;
+    endgame_res -= CENTRE_MANHATTAN[lsb_index(BOARD[11])] << 3;
 
     let gamephase_score = get_gamephase_score();
     if (gamephase_score > opening_phase) { // OPENING
@@ -852,6 +858,8 @@ function best_eval(depth, alpha, beta) {
         TURN ^= 1;
         hash_key = ch;
 
+        if (STOPPED) { return 0; }
+
         if (eval > alpha) {
             hash_flag = 1;
             if (!get_move_capture(move)) {
@@ -989,6 +997,8 @@ let hash_key;
 let ZOB_TABLE;
 let HASH_TABLE;
 let HASH_SIZE = 4194304;
+
+let STOPPED = 0;
 
 let COUNT = 0;
 let LOOKUP = 0;
