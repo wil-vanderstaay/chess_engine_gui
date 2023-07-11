@@ -1777,6 +1777,96 @@ function book_move() {
     return create_move_san(move);
 }
 
+// SORT -----------------------------------------------------------------------------------------------------------------------------------------------
+
+function swap(ary, a, b) {
+    let t = ary[a];
+    ary[a] = ary[b];
+    ary[b] = t;
+}
+
+function insertion_sort(ary) {
+    for (let i = 1, l = ary.length; i < l; i++) {
+        let value = ary[i];
+        for (var j = i - 1; j >= 0; j--) {
+            if (ary[j][0] <= value[0])
+                break;
+            ary[j + 1] = ary[j];
+        }
+        ary[j + 1] = value;
+    }
+    return ary;
+}
+
+function shell_sort_bound(ary, start, end) { // error when start = 0, end = 1
+    let inc = Math.round((start + end) / 2),
+        i, j, t;
+    while (inc >= start && inc > 0) {
+        for (i = inc; i < end; i++) {
+            t = ary[i];
+            j = i;
+            while (j >= inc && ary[j - inc][0] > t[0]) {
+                ary[j] = ary[j - inc];
+                j -= inc;
+            }
+            ary[j] = t;
+        }
+        inc = Math.round(inc / 2.2);
+    }
+
+    return ary;
+}
+
+function inplace_quicksort_partition(ary, start, end, pivotIndex) {
+    let i = start, j = end;
+    let pivot = ary[pivotIndex];
+
+    while (true) {
+        while (ary[i][0] < pivot[0]) { i++ };
+        j--;
+        while (pivot[0] < ary[j][0]) { j-- };
+        if (!(i < j)) {
+            return i;
+        }
+        swap(ary, i, j);
+        i++;
+    }
+}
+
+function fast_quicksort(ary) {
+    if (ary.length <= 1) 
+        return ary;
+
+    let stack = [];
+    let entry = [0, ary.length, 2 * Math.floor(Math.log(ary.length) / Math.log(2))];
+    stack.push(entry);
+    while (stack.length > 0) {
+        entry = stack.pop();
+        let start = entry[0];
+        let end = entry[1];
+        let depth = entry[2];
+        // console.log(start, end, depth);
+        if (depth == 0) {
+            ary = shell_sort_bound(ary, start, end);
+            continue;
+        }
+        depth--;
+        let pivot = Math.round((start + end) / 2);
+
+        let pivotNewIndex = inplace_quicksort_partition(ary, start, end, pivot);
+        if (end - pivotNewIndex > 16) {
+            entry = [pivotNewIndex, end, depth];
+            stack.push(entry);
+        }
+        if (pivotNewIndex - start > 16) {
+            entry = [start, pivotNewIndex, depth];
+            stack.push(entry);
+        }
+    }
+    ary = insertion_sort(ary);
+    return ary;
+}
+
 // EVALUATE -----------------------------------------------------------------------------------------------------------------------------------------------
 
 let piece_values = [
@@ -1991,7 +2081,9 @@ function order_moves(moves, best_move=0) {
         let score = (move == best_move) ? 160 : score_move(move, defenders[get_move_target(move)], max_history);
         res.push([score, moves[i]]);
     }
-    res.sort(function(a, b) { return b[0] - a[0]; });
+    // res.sort(function(a, b) { return b[0] - a[0]; });
+    fast_quicksort(res);
+    res.reverse();
     for (let i = 0; i < res.length; i++) {
         res[i] = res[i][1];
     }
