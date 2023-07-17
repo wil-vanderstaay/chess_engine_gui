@@ -500,18 +500,18 @@ class HashTable { // store score of positions previously explored at certain dep
         this.hashes = {};
     }   
 
-    get(depth, alpha, beta) {
+    get(depth, alpha, beta, best_move) {
         let key = ((hash_key[0] % HASH_SIZE) + (hash_key[1] % HASH_SIZE)) % HASH_SIZE;
         let entry = this.hashes[key];
         if (entry != null && entry.first == hash_key[0] && entry.last == hash_key[1]) {
             if (entry.depth >= depth) {
-                if (entry.flag == 1) { return [0, entry.score]; } // exact
-                else if (entry.flag == 2 && entry.score <= alpha) { return [0, alpha]; } // alpha
-                else if (entry.flag == 3 && entry.score >= beta) { return [0, beta]; } // beta
+                if (entry.flag == 1) { return entry.score; } // exact
+                else if (entry.flag == 2 && entry.score <= alpha) { return alpha; } // alpha
+                else if (entry.flag == 3 && entry.score >= beta) { return beta; } // beta
             }
-            return [1, entry.move];
+            this.hashes[key].move = best_move;
         }
-        return [0, null];
+        return null;
     }
 
     set(depth, flag, score, move) {
@@ -570,7 +570,18 @@ function init_hash() {
 }
 
 function is_repetition() {
-    return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 3;
+    let count = 0;
+    for (let i = GAME_HASH.length - 1; i >= 0; i--) {
+        let item = GAME_HASH[i];
+        if (item[0] == hash_key[0] && item[1] == hash_key[1]) {
+            count++;
+            if (count >= 2) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+    // return GAME_HASH.filter(x => x[0] == hash_key[0] && x[1] == hash_key[1]).length >= 3;
 }
 
 // DEFINE MOVES ----------------------------------------------------------------------------------------------------------------------
@@ -2083,7 +2094,7 @@ function order_moves(moves, best_move=0) {
     }
     // res.sort(function(a, b) { return b[0] - a[0]; });
     fast_quicksort(res);
-    res.reverse();
+    res.reverse(); // TODO - sort in correct order by default
     for (let i = 0; i < res.length; i++) {
         res[i] = res[i][1];
     }
@@ -2147,17 +2158,17 @@ function best_eval_captures(depth, alpha, beta) {
 }
 
 function best_eval(depth, alpha, beta) {
+    pv_length[ply] = ply;
     if (ply && is_repetition()) { return 0; }
 
     let best_move = 0;
-    let res = HASH_TABLE.get(depth, alpha, beta);
-    if (res[0]) { best_move = res[1]; }
-    else if (ply && res[1] != null) {
+    let res = HASH_TABLE.get(depth, alpha, beta, best_move);
+    if (ply && res != null) {
         LOOKUP++;
-        return res[1];
+        return res;
     }
 
-    pv_length[ply] = ply;
+    
     if (depth == 0) { return best_eval_captures(8, alpha, beta); }
     else if (ply >= MAX_PLY) { return evaluate_board(); }
 

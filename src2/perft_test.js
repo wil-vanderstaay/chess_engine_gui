@@ -1,4 +1,4 @@
-function run_tests() {
+function perft_tests() {
     // input: fen, best move, search depth
     // output: PV, positions, lookups, time
 
@@ -47,41 +47,24 @@ function run_tests() {
     ];
     make_table();
 
-    let results = [];
+    let results = [["Positions", "Time (s)"]];
+    let tot_nodes = 0;
+    let tot_time = 0;
     for (let i = 0; i < tests.length; i++) {
         let test = tests[i];
         load_test(test[0]);
-        let best_move = test.length > 1 ? test[1] : "";
-        let depth = test.length > 2 ? test[2] : 4;
 
         let start = performance.now();
-        let eval = search(0, depth);
-        let time = performance.now() - start;
+        let perf_nodes = perft(4, 0);
+        let time = performance.now() - start; 
 
-        let best_moves = "";
-        for (let j = 0; j < pv_length[0] && best_moves.length < 20; j++) {
-            if (pv_table[0][j]) {
-                best_moves += get_move_san(pv_table[0][j], false) + ", ";
-            } else {
-                break;
-            }
-        }    
-        while (best_moves.length < 20) {
-            best_moves += " ";
-        }    
+        let r = [perf_nodes, Math.round(time * 1000) / 1000000];
+        results.push(r);
+        tot_nodes += r[0];
+        tot_time += r[1];
 
-        results.push([BOARD, depth, best_move, best_moves, COUNT, LOOKUP, Math.round(time * 1000) / 1000000]);
         console.log(`Test ${i + 1}.`);
     }
-
-    let results_table = [["Depth", "Best Move", "PV", "Positions", "Lookup", "Time (s)"]];
-    for (let i = 0; i < results.length; i++) {
-        results_table.push(results[i].slice(1));
-
-        // let r = results[i];
-        // print_board(r[0]);
-        // console.log(`Depth: ${r[1]}\tExpected Move: ${r[2]}`);
-        // console.log(`PV: ${r[3]}\tPositions: ${r[4]}\tLookup: ${r[5]}\tTime: ${Math.round(r[6] * 1000) / 1000000}\t`);
-    }
-    console.table(results_table);
+    console.table(results);
+    console.log("NPS: ", Math.round(tot_nodes / tot_time));
 }
