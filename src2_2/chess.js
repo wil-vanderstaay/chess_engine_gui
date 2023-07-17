@@ -126,10 +126,10 @@ function get_move_source(move) { return move & 63; }
 function get_move_target(move) { return (move & 4032) >> 6; }
 function get_move_piece(move) { return (move & 61440) >> 12; }
 function get_move_promote(move) { return (move & 983040) >> 16; }
-function get_move_capture(move) { return (move & 1048576) >> 20; }
-function get_move_double(move) { return (move & 2097152) >> 21; }
-function get_move_enpassant(move) { return (move & 4194304) >> 22; }
-function get_move_castle(move) { return (move & 8388608) >> 23; }
+function get_move_capture(move) { return move & 1048576; }
+function get_move_double(move) { return move & 2097152; }
+function get_move_enpassant(move) { return move & 4194304; }
+function get_move_castle(move) { return move & 8388608; }
 function get_move_uci(move) { 
     if (!move) { return ""; }
     let letters = " nbrq";
@@ -234,9 +234,9 @@ function print_castle(castle) {
     console.log(get_castle_wk(castle) + " " + get_castle_wq(castle) + ", " + get_castle_bk(castle) + " " + get_castle_bq(castle));
 }
 function get_castle_wk(castle) { return castle & 1; }
-function get_castle_wq(castle) { return (castle & 2) >> 1; }
-function get_castle_bk(castle) { return (castle & 4) >> 2; }
-function get_castle_bq(castle) { return (castle & 8) >> 3; }
+function get_castle_wq(castle) { return castle & 2; }
+function get_castle_bk(castle) { return castle & 4; }
+function get_castle_bq(castle) { return castle & 8; }
     
 // BITBOARD ----------------------------------------------------------------------------------------------------------------------
 /*
@@ -339,7 +339,7 @@ function create_board(board) { // board is a 64-length list containing piece val
 }
 
 function copy_board() {
-    return [copy_bitboard(BOARD[0]), copy_bitboard(BOARD[1]), copy_bitboard(BOARD[2]), copy_bitboard(BOARD[3]), copy_bitboard(BOARD[4]), copy_bitboard(BOARD[5]), copy_bitboard(BOARD[6]), copy_bitboard(BOARD[7]), copy_bitboard(BOARD[8]), copy_bitboard(BOARD[9]), copy_bitboard(BOARD[10]), copy_bitboard(BOARD[11]), copy_bitboard(BOARD[12]), copy_bitboard(BOARD[13]), copy_bitboard(BOARD[14])];
+    return [[BOARD[0][0], BOARD[0][1]], [BOARD[1][0], BOARD[1][1]], [BOARD[2][0], BOARD[2][1]], [BOARD[3][0], BOARD[3][1]], [BOARD[4][0], BOARD[4][1]], [BOARD[5][0], BOARD[5][1]], [BOARD[6][0], BOARD[6][1]], [BOARD[7][0], BOARD[7][1]], [BOARD[8][0], BOARD[8][1]], [BOARD[9][0], BOARD[9][1]], [BOARD[10][0], BOARD[10][1]], [BOARD[11][0], BOARD[11][1]], [BOARD[12][0], BOARD[12][1]], [BOARD[13][0], BOARD[13][1]], [BOARD[14][0], BOARD[14][1]]];
 }
 
 function legal_move(pos, new_pos) { // determine if moving from pos to new_pos is a possible move
@@ -387,11 +387,19 @@ function do_move(move, ignore_check=false) {
     let target = get_move_target(move);
     let piece = get_move_piece(move);
 
+    let opp_colour = TURN ^ 1;
+    let opp_start = opp_colour * 6;
+
+    let curr_occ = 12 + TURN;
+    let opp_occ = 12 + opp_colour;
+
     // Remove captured piece
     if (get_move_capture(move)) {
-        for (let i = 0; i < 12; i++) {     
+        for (let i = opp_start; i < opp_start + 6; i++) {     
             if (get_bit(BOARD[i], target)) {
                 pop_bit(BOARD[i], target);
+                pop_bit(BOARD[opp_occ], target);
+                pop_bit(BOARD[14], target);
                 hash_key = xor_bitboards(hash_key, ZOB_TABLE[target][i]);
                 break;
             }
@@ -400,7 +408,11 @@ function do_move(move, ignore_check=false) {
 
     // Move piece
     pop_bit(BOARD[piece], source);
+    pop_bit(BOARD[curr_occ], source);
+    pop_bit(BOARD[14], source);
     set_bit(BOARD[piece], target);
+    set_bit(BOARD[curr_occ], target);
+    set_bit(BOARD[14], target);
     hash_key = xor_bitboards(hash_key, ZOB_TABLE[source][piece]);
     hash_key = xor_bitboards(hash_key, ZOB_TABLE[target][piece]);
 
@@ -421,10 +433,11 @@ function do_move(move, ignore_check=false) {
 
     // Perform enpassant
     } else if (get_move_enpassant(move)) {
-        let p = (TURN ^ 1) * 6;
         let s = target + 8 - (TURN << 4);
-        pop_bit(BOARD[p], s);
-        hash_key = xor_bitboards(hash_key, ZOB_TABLE[s][p]);
+        pop_bit(BOARD[opp_start], s);
+        pop_bit(BOARD[opp_occ], s);
+        pop_bit(BOARD[14], s);
+        hash_key = xor_bitboards(hash_key, ZOB_TABLE[s][opp_start]);
 
 
     // Perform castle 
@@ -434,33 +447,21 @@ function do_move(move, ignore_check=false) {
         let rook_target = (kingside) ? target - 1 : target + 1;
 
         pop_bit(BOARD[piece - 2], rook_source);
+        pop_bit(BOARD[curr_occ], rook_source);
+        pop_bit(BOARD[14], rook_source);
         set_bit(BOARD[piece - 2], rook_target);
+        set_bit(BOARD[curr_occ], rook_target);
+        set_bit(BOARD[14], rook_target);
         hash_key = xor_bitboards(hash_key, ZOB_TABLE[rook_source][piece - 2]);
         hash_key = xor_bitboards(hash_key, ZOB_TABLE[rook_target][piece - 2]);
     } 
     
     // Re-validate hash key
-    if (EN_PASSANT_SQUARE) {
-        hash_key = xor_bitboards(hash_key, ZOB_TABLE[66][EN_PASSANT_SQUARE]);
-    }
-    EN_PASSANT_SQUARE = null;
-    if (get_move_double(move)) {
-        EN_PASSANT_SQUARE = target + 8 - (TURN << 4);
-        hash_key = xor_bitboards(hash_key, ZOB_TABLE[66][EN_PASSANT_SQUARE]);   
-    }
+    hash_key = xor_bitboards(hash_key, ZOB_TABLE[66][EN_PASSANT_SQUARE]);
+    EN_PASSANT_SQUARE = get_move_double(move) ? target + 8 - (TURN << 4) : 0;
+    hash_key = xor_bitboards(hash_key, ZOB_TABLE[66][EN_PASSANT_SQUARE]);   
 
     update_castle(source, target);
-
-    // Update occupancies
-    BOARD[12] = [0, 0];
-    BOARD[13] = [0, 0];
-    for (let i = 0; i < 6; i++) { // white
-        BOARD[12] = or_bitboards(BOARD[12], BOARD[i]);
-    }
-    for (let i = 6; i < 12; i++) { // black
-        BOARD[13] = or_bitboards(BOARD[13], BOARD[i]);
-    }
-    BOARD[14] = or_bitboards(BOARD[12], BOARD[13]); // board
 
     // Moving into check, reset state
     if (!ignore_check && is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {

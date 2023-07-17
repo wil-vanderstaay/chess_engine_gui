@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Wil's Java Chess</title>
+        <style>            
+            .chess-board { border-spacing: 0; user-select: none; }
+            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
+
+            .light { background: #f1d9c0; color: #a97a65; }
+            .dark { background: #a97a65; color: #f1d9c0; }
+
+            .chess-piece { position: absolute; z-index: 1000; }
+            .move-circle { padding-left: 20px; }
+        </style>
+    </head>
+    <body>
+        <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
+
+            <div id="eval-container" style="position: relative; height: 94vh; width: 20px; outline: 2px solid black; background-color: white; font-size: small; text-align: center;">
+                <div id="eval-bar" style="height: 50%; background-color: black;">
+                    <div id="black-eval" style="color: white;"></div>
+                </div>
+                <div id="white-eval" style="position: absolute; bottom: 0px; width: 100%;"></div>
+            </div>
+            
+            <div id="chess-board" style="margin-left: 20px; margin-right: 20px;"></div>
+            
+            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;">
+                <button onclick="undo_move()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/undo.png"></button>
+                <button onclick="start_game(true)" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: -3px;" src="../imgs/chess_pieces/0.png"></button>
+                <button onclick="start_game(false)" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: -3px;" src="../imgs/chess_pieces/6.png"></button>
+                <br></br>
+                <button onclick="import_fen()" style="height: 4%; width: 100%;">Import</button>
+                <button id="setup" onclick="run_setup_board()" style="height: 4%; width: 100%;">Setup</button>
+                <button onclick="add_piece()" style="height: 5%; width: 100%;"><div style="height: 100%; margin-top: 6px; margin-left: -20px;">+<img draggable="false" style="height: 20px; margin-top: -3px; position: absolute;" src="../imgs/chess_pieces/4.png"></div></button>
+                <br></br>
+                <u>Analysis</u>
+                <button onclick="open_chess_com()" style="height: 6.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/chesscom.png"></button>
+                <button onclick="open_lichess()" style="height: 6.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/lichess.png"></button>
+                <br></br>
+                <u>Endgame</u>
+                <button onclick="play_rand_endgame(false)" style="height: 6.5%; width: 100%;"><img draggable="false" style="margin-left: -2px; height: 100%;" src="../imgs/dice.png"></button>
+                <button onclick="play_rand_endgame(true)" style="height: 6.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/book.png"></button>
+                <div style="height: 22%; font-size: 12px; text-align: center; display: flex; justify-content: center; flex-direction: column;" id="loading"></div>
+
+            </div>
+        </div>
+        <div id="stored_fen"></div>
+    </body>
+
+    <script src="./chess.js"></script>
+    <script src="./perft_test.js"></script>
+    <script src="./search_test.js"></script>
+    <script>
+        window.onresize = () => { display_board(); };
+    </script>
+
+</html>
