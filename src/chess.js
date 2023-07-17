@@ -126,10 +126,10 @@ function get_move_source(move) { return move & 63; }
 function get_move_target(move) { return (move & 4032) >> 6; }
 function get_move_piece(move) { return (move & 61440) >> 12; }
 function get_move_promote(move) { return (move & 983040) >> 16; }
-function get_move_capture(move) { return (move & 1048576) >> 20; }
-function get_move_double(move) { return (move & 2097152) >> 21; }
-function get_move_enpassant(move) { return (move & 4194304) >> 22; }
-function get_move_castle(move) { return (move & 8388608) >> 23; }
+function get_move_capture(move) { return move & 1048576; }
+function get_move_double(move) { return move & 2097152; }
+function get_move_enpassant(move) { return move & 4194304; }
+function get_move_castle(move) { return move & 8388608; }
 function get_move_uci(move) { 
     if (!move) { return ""; }
     let letters = " nbrq";
@@ -234,9 +234,9 @@ function print_castle(castle) {
     console.log(get_castle_wk(castle) + " " + get_castle_wq(castle) + ", " + get_castle_bk(castle) + " " + get_castle_bq(castle));
 }
 function get_castle_wk(castle) { return castle & 1; }
-function get_castle_wq(castle) { return (castle & 2) >> 1; }
-function get_castle_bk(castle) { return (castle & 4) >> 2; }
-function get_castle_bq(castle) { return (castle & 8) >> 3; }
+function get_castle_wq(castle) { return castle & 2; }
+function get_castle_bk(castle) { return castle & 4; }
+function get_castle_bq(castle) { return castle & 8; }
     
 // BITBOARD ----------------------------------------------------------------------------------------------------------------------
 /*
@@ -339,7 +339,7 @@ function create_board(board) { // board is a 64-length list containing piece val
 }
 
 function copy_board() {
-    return [copy_bitboard(BOARD[0]), copy_bitboard(BOARD[1]), copy_bitboard(BOARD[2]), copy_bitboard(BOARD[3]), copy_bitboard(BOARD[4]), copy_bitboard(BOARD[5]), copy_bitboard(BOARD[6]), copy_bitboard(BOARD[7]), copy_bitboard(BOARD[8]), copy_bitboard(BOARD[9]), copy_bitboard(BOARD[10]), copy_bitboard(BOARD[11]), copy_bitboard(BOARD[12]), copy_bitboard(BOARD[13]), copy_bitboard(BOARD[14])];
+    return [[BOARD[0][0], BOARD[0][1]], [BOARD[1][0], BOARD[1][1]], [BOARD[2][0], BOARD[2][1]], [BOARD[3][0], BOARD[3][1]], [BOARD[4][0], BOARD[4][1]], [BOARD[5][0], BOARD[5][1]], [BOARD[6][0], BOARD[6][1]], [BOARD[7][0], BOARD[7][1]], [BOARD[8][0], BOARD[8][1]], [BOARD[9][0], BOARD[9][1]], [BOARD[10][0], BOARD[10][1]], [BOARD[11][0], BOARD[11][1]], [BOARD[12][0], BOARD[12][1]], [BOARD[13][0], BOARD[13][1]], [BOARD[14][0], BOARD[14][1]]];
 }
 
 function legal_move(pos, new_pos) { // determine if moving from pos to new_pos is a possible move
@@ -464,7 +464,7 @@ function do_move(move, ignore_check=false) {
     update_castle(source, target);
 
     // Moving into check, reset state
-    if (!ignore_check && is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), TURN ^ 1)) {
+    if (!ignore_check && is_square_attacked(lsb_index(BOARD[6 * TURN + 5]), opp_colour)) {
         BOARD = cb;
         CASTLE = cc;
         EN_PASSANT_SQUARE = ce;
@@ -770,13 +770,20 @@ function generate_pseudo_moves() {
     let piece = 6 * TURN;
     let piece_board = copy_bitboard(BOARD[piece]);
     let pawn_direction = TURN ? 8 : -8;
+
+    let curr_occ = 12 + TURN;
+    let opp_occ = 12 + (TURN ^ 1);
+
     while (bool_bitboard(piece_board)) {
         let source = pop_lsb_index(piece_board);
         let target = source + pawn_direction;
 
+        let promote = target < 8 || target >= 56;
+        let double = source < 16 || source >= 48;
+
         // Push
         if (!get_bit(BOARD[14], target)) {
-            if (target < 8 || 56 <= target) { // promotion
+            if (promote) { // promotion
                 moves.push(create_move(source, target, piece, piece + 1)); // knight
                 moves.push(create_move(source, target, piece, piece + 2)); // bishop
                 moves.push(create_move(source, target, piece, piece + 3)); // rook
@@ -785,19 +792,17 @@ function generate_pseudo_moves() {
                 // One square push
                 moves.push(create_move(source, target, piece));
                 // Two square push
-                let srow = source >> 3;
-                if (srow == (TURN ? 1 : 6) && !get_bit(BOARD[14], target + pawn_direction)) {
+                if (double && !get_bit(BOARD[14], target + pawn_direction)) {
                     moves.push(create_move(source, target + pawn_direction, piece, 0, 0, 1));
                 }
             }
         }
 
         // Capture
-        let attacks = and_bitboards(PAWN_ATTACK[TURN][source], BOARD[12 + TURN ^ 1]);
+        let attacks = and_bitboards(PAWN_ATTACK[TURN][source], BOARD[opp_occ]);
         while (bool_bitboard(attacks)) {
             let att = pop_lsb_index(attacks);
-            let arow = att >> 3;
-            if (arow == 0 || arow == 7) { // Promote
+            if (promote) { // Promote
                 moves.push(create_move(source, att, piece, piece + 1, 1));
                 moves.push(create_move(source, att, piece, piece + 2, 1));
                 moves.push(create_move(source, att, piece, piece + 3, 1));
@@ -817,14 +822,10 @@ function generate_pseudo_moves() {
     piece_board = copy_bitboard(BOARD[piece]);
     while(bool_bitboard(piece_board)) {
         let source = pop_lsb_index(piece_board);
-        let attacks = nand_bitboards(KNIGHT_ATTACK[source], BOARD[12 + TURN]);
+        let attacks = nand_bitboards(KNIGHT_ATTACK[source], BOARD[curr_occ]);
         while (bool_bitboard(attacks)) {
             let att = pop_lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
+            moves.push(create_move(source, att, piece, 0, get_bit(BOARD[opp_occ], att)));
         }
     }
     // Bishop moves
@@ -832,14 +833,10 @@ function generate_pseudo_moves() {
     piece_board = copy_bitboard(BOARD[piece]);
     while(bool_bitboard(piece_board)) {
         let source = pop_lsb_index(piece_board);
-        let attacks = nand_bitboards(bishop_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
+        let attacks = nand_bitboards(bishop_attack_fly(source, BOARD[14]), BOARD[curr_occ]);
         while (bool_bitboard(attacks)) {
             let att = pop_lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
+            moves.push(create_move(source, att, piece, 0, get_bit(BOARD[opp_occ], att)));
         }
     }
     // Rook moves
@@ -847,14 +844,10 @@ function generate_pseudo_moves() {
     piece_board = copy_bitboard(BOARD[piece]);
     while(bool_bitboard(piece_board)) {
         let source = pop_lsb_index(piece_board);
-        let attacks = nand_bitboards(rook_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
+        let attacks = nand_bitboards(rook_attack_fly(source, BOARD[14]), BOARD[curr_occ]);
         while (bool_bitboard(attacks)) {
             let att = pop_lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
+            moves.push(create_move(source, att, piece, 0, get_bit(BOARD[opp_occ], att)));
         }
     }
     // Queen moves
@@ -862,14 +855,10 @@ function generate_pseudo_moves() {
     piece_board = copy_bitboard(BOARD[piece]);
     while(bool_bitboard(piece_board)) {
         let source = pop_lsb_index(piece_board);
-        let attacks = nand_bitboards(queen_attack_fly(source, BOARD[14]), BOARD[12 + TURN]);
+        let attacks = nand_bitboards(queen_attack_fly(source, BOARD[14]), BOARD[curr_occ]);
         while (bool_bitboard(attacks)) {
             let att = pop_lsb_index(attacks);
-            if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-                moves.push(create_move(source, att, piece, 0, 1));
-            } else {
-                moves.push(create_move(source, att, piece));
-            }
+            moves.push(create_move(source, att, piece, 0, get_bit(BOARD[opp_occ], att)));
         }
     }
     // King moves
@@ -877,14 +866,10 @@ function generate_pseudo_moves() {
     piece_board = copy_bitboard(BOARD[piece]);
     // Normal moves
     let source = lsb_index(piece_board);
-    let attacks = nand_bitboards(KING_ATTACK[source], BOARD[12 + TURN]);
+    let attacks = nand_bitboards(KING_ATTACK[source], BOARD[curr_occ]);
     while (bool_bitboard(attacks)) {
         let att = pop_lsb_index(attacks);
-        if (get_bit(BOARD[12 + TURN ^ 1], att)) {
-            moves.push(create_move(source, att, piece, 0, 1));
-        } else {
-            moves.push(create_move(source, att, piece));
-        }
+        moves.push(create_move(source, att, piece, 0, get_bit(BOARD[opp_occ], att)));
     }
 
     // Castling
@@ -1839,8 +1824,8 @@ function inplace_quicksort_partition(ary, start, end, pivotIndex) {
 }
 
 function fast_quicksort(ary) {
-    if (ary.length <= 1) 
-        return ary;
+    if (ary.length <= 1) { return ary; }
+    let mid = Math.floor(ary.length / 2);
 
     let stack = [];
     let entry = [0, ary.length, 2 * Math.floor(Math.log(ary.length) / Math.log(2))];
@@ -1859,11 +1844,11 @@ function fast_quicksort(ary) {
         let pivot = Math.round((start + end) / 2);
 
         let pivotNewIndex = inplace_quicksort_partition(ary, start, end, pivot);
-        if (end - pivotNewIndex > 16) {
+        if (end - pivotNewIndex > mid) {
             entry = [pivotNewIndex, end, depth];
             stack.push(entry);
         }
-        if (pivotNewIndex - start > 16) {
+        if (pivotNewIndex - start > mid) {
             entry = [start, pivotNewIndex, depth];
             stack.push(entry);
         }
