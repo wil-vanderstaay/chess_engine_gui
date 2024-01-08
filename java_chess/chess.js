@@ -243,6 +243,21 @@ function get_castle_bq(castle) { return castle & 8; }
     A list of 2 32-bit numbers to represent the board (due to javascript number limitations)
     First number for top 32 squares, second number for bottom 32 squares
 */
+function sub_bitboards(bitboard1, bitboard2) { // subtract as if were 2 64-bit numbers
+    if (bitboard1[0] - bitboard2[0] < 0) {
+        return [bitboard1[0] - bitboard2[0] + 16, bitboard1[1] - bitboard2[1] - 1];
+    }
+    return [bitboard1[0] - bitboard2[0], bitboard1[1] - bitboard2[1]];
+}
+function sub_bit(bitboard, i) {
+    let b = copy_bitboard(bitboard);
+    for (; i < 64; i++) {
+        if (get_bit(b, i)) { pop_bit(b, i); return b; }
+        else { set_bit(b, i); }
+    }
+    return b;
+}
+
 function and_bitboards(bitboard1, bitboard2) {
     return [bitboard1[0] & bitboard2[0], bitboard1[1] & bitboard2[1]];
 }
@@ -256,8 +271,19 @@ function nand_bitboards(bitboard1, bitboard2) {
     return [bitboard1[0] & ~bitboard2[0], bitboard1[1] & ~bitboard2[1]]
 }
 
-function get_bit(bitboard, i) { return (bitboard[+(i >= 32)] & (1 << (i & 31))) ? 1 : 0; }
-function set_bit(bitboard, i) { bitboard[+(i >= 32)] |= (1 << (i & 31)); }
+function get_bit(bitboard, i) { 
+    if (i & 32) {
+        return (bitboard[1] & (1 << (i & 31))) ? 1 : 0;
+    }
+    return (bitboard[0] & (1 << i)) ? 1 : 0;
+}
+function set_bit(bitboard, i) { 
+    if (i & 32) {
+        bitboard[1] |= (1 << (i & 31));
+    } else {
+        bitboard[0] |= (1 << i);
+    }
+}
 function pop_bit(bitboard, i) {
     let bit = get_bit(bitboard, i);
     if (bit) { bitboard[+(i >= 32)] ^= (1 << (i & 31)); }
@@ -581,6 +607,8 @@ function is_repetition() {
 // DEFINE MOVES ----------------------------------------------------------------------------------------------------------------------
 
 function initialise_constants() { // attack masks for pawns knights kings from any square 
+    NUM_SQUARES_EDGE = squares_to_edge(); // [square][dir] (0 N, 1 E, 2 S, 3 W, 4 NE, 5 SE, 6 SW, 7 NW)
+    DIR_OFFSETS = [-8, 1, 8, -1, -7, 9, 7, -9]; // [dir]
     PAWN_ATTACK = pawn_attack(); // [side][square]
     KNIGHT_ATTACK = knight_attack(); // [square]
     KING_ATTACK = king_attack(); // [square]
@@ -601,6 +629,18 @@ function initialise_constants() { // attack masks for pawns knights kings from a
         }
     }
 
+    function squares_to_edge() {
+        let res = new Array(64);
+        for (let i = 0; i < 64; i++) {
+            let r = i >> 3;
+            let c = i & 7;
+            res[i] = [
+                r, 7 - c, 7 - r, c, 
+                Math.min(r, 7 - c), Math.min(7 - c, 7 - r), Math.min(7 - r, c), Math.min(c, r)
+            ];
+        }
+        return res;
+    }
     function pawn_attack() {
         let res = [new Array(64), new Array(64)];
         for (let i = 0; i < 64; i++) { // player
@@ -681,6 +721,7 @@ function initialise_constants() { // attack masks for pawns knights kings from a
 }
 
 function bishop_attack_fly(square, blocker) {
+    return sliding_moves(square, 4, 8, blocker);
     let res = [0, 0];
     let r = square >> 3; let c = square & 7;
     let o = 1;
@@ -711,6 +752,7 @@ function bishop_attack_fly(square, blocker) {
     return res;
 }
 function rook_attack_fly(square, blocker) {
+    return sliding_moves(square, 0, 4, blocker);
     let res = [0, 0];
     let r = square >> 3; let c = square & 7;
     let o = 1;
@@ -740,7 +782,21 @@ function rook_attack_fly(square, blocker) {
     }
     return res;
 }
+function sliding_moves(square, start_dir_index, end_dir_index, blocker) {
+    let res = [0, 0];
+    for (; start_dir_index < end_dir_index; start_dir_index++) {
+        let offset = DIR_OFFSETS[start_dir_index];
+        let edge = NUM_SQUARES_EDGE[square][start_dir_index];
+        for (let i = 0; i < edge; i++) {
+            let target = square + offset * (i + 1);
+            set_bit(res, target);
+            if (get_bit(blocker, target)) { break; }
+        }
+    }
+    return res;
+}
 function queen_attack_fly(square, blocker) {
+    return sliding_moves(square, 0, 8, blocker);
     return or_bitboards(bishop_attack_fly(square, blocker), rook_attack_fly(square, blocker));
 }
 
@@ -748,6 +804,8 @@ function queen_attack_fly(square, blocker) {
 
 function is_square_attacked(square, side) {
     let att_piece = side * 6;
+    // Attacked by pawns
+    if (bool_bitboard(and_bitboards(PAWN_ATTACK[side ^ 1][square], BOARD[att_piece]))) { return 1; }
     // Attacked by knights
     if (bool_bitboard(and_bitboards(KNIGHT_ATTACK[square], BOARD[att_piece + 1]))) { return 2; }
     // Attacked by bishops
@@ -756,8 +814,6 @@ function is_square_attacked(square, side) {
     if (bool_bitboard(and_bitboards(rook_attack_fly(square, BOARD[14]), BOARD[att_piece + 3]))) { return 4; }
     // Attacked by queens
     if (bool_bitboard(and_bitboards(queen_attack_fly(square, BOARD[14]), BOARD[att_piece + 4]))) { return 5; }
-    // Attacked by pawns
-    if (bool_bitboard(and_bitboards(PAWN_ATTACK[side ^ 1][square], BOARD[att_piece]))) { return 1; }
     // Attacked by kings
     if (bool_bitboard(and_bitboards(KING_ATTACK[square], BOARD[att_piece + 5]))) { return 6; }
     
@@ -1993,7 +2049,8 @@ function evaluate_board() {
         bitboard = copy_bitboard(BOARD[p + 6]);
         while (bool_bitboard(bitboard)) {
             index = pop_lsb_index(bitboard);
-            index += (7 - (index >> 3 << 1)) << 3; // flip rows
+            // index += (7 - (index >> 3 << 1)) << 3; // flip rows
+            index = (56 - (index & 56)) + (index & 7)
             opening_res -= piece_values[p] + piece_position_values[p][index];
             endgame_res -= piece_values[p + 6] + piece_position_values[p + 6][index]; 
         }
@@ -2147,7 +2204,6 @@ function best_eval(depth, alpha, beta) {
         return res;
     }
 
-    
     if (depth == 0) { return best_eval_captures(8, alpha, beta); }
     else if (ply >= MAX_PLY) { return evaluate_board(); }
 
@@ -2976,6 +3032,7 @@ function prepare_game(whiteDown, fen) {
     document.getElementById("setup").style.backgroundColor = "";
 
     // Setup eval bar
+    document.getElementById("eval-bar").style.height = "50%";
     if (PLAYER_WHITE && document.getElementById("black-eval").style.position) {
         document.getElementById("eval-container").style.backgroundColor = "white";
         document.getElementById("eval-bar").style.backgroundColor = "black";
@@ -3014,6 +3071,8 @@ function start_game(whiteDown, fen=START_FEN) {
 
 let START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+let NUM_SQUARES_EDGE;
+let DIR_OFFSETS;
 let PAWN_ATTACK;
 let KNIGHT_ATTACK;
 let KING_ATTACK;

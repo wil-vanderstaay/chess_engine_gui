@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Wil's Java Chess</title>
+        <style>            
+            .chess-board { border-spacing: 0; user-select: none; }
+            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
+            .chess-piece { position: absolute; z-index: 1000; }
+
+            .light { background: #f1d9c0; color: #a97a65; }
+            .light.focus { background: #59abdd }
+            .light.highlight { background: #ddd07c }
+
+            .dark { background: #a97a65; color: #f1d9c0; }
+            .dark.focus { background: #3e90c3 }
+            .dark.highlight { background: #c59e36 }
+
+            .red { background: #ff0000 }
+
+        </style>
+    </head>
+    <body>
+        <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
+            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;"></div>
+            <div id="chess-board" style="margin-left: 20px; margin-right: 20px;"></div>
+            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;"></div>
+        </div>
+        <div id="stored_fen"></div>
+    </body>
+
+    <script src="./chess.js"></script>
+    <!-- <script>
+        window.onresize = () => { game.display(); };
+    </script> -->
+
+</html>
