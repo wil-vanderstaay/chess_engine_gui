@@ -4,7 +4,7 @@
         <title>Wil's Java Chess</title>
         <style>            
             .chess-board { border-spacing: 0; user-select: none; }
-            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 10px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
+            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 15px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
             .chess-piece { position: absolute; z-index: 1000; }
 
             .light { background: #f1d9c0; color: #a97a65; }
@@ -25,12 +25,14 @@
             <div id="chess-board" style="margin-left: 20px; margin-right: 20px;"></div>
             <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;"></div>
         </div>
-        <div id="stored_fen"></div>
+        <div hidden id="stored_fen"></div>
+        <!-- <textarea id="rook"></textarea>
+        <textarea id="bishop"></textarea> -->
     </body>
 
     <script src="./chess.js"></script>
-    <!-- <script>
+    <script>
         window.onresize = () => { game.display(); };
-    </script> -->
+    </script>
 
 </html>
