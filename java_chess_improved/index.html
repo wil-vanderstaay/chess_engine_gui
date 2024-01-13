@@ -21,18 +21,29 @@
     </head>
     <body>
         <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
-            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;"></div>
+            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;">
+                <div id="botTimer"></div>
+                <div id="playerTimer"></div>
+            </div>
             <div id="chess-board" style="margin-left: 20px; margin-right: 20px;"></div>
             <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;"></div>
         </div>
         <div hidden id="stored_fen"></div>
-        <!-- <textarea id="rook"></textarea>
-        <textarea id="bishop"></textarea> -->
     </body>
 
-    <script src="./chess.js"></script>
-    <script>
+    <!-- <script defer src="./chess.js"></script> -->
+    <!-- <script>
         window.onresize = () => { game.display(); };
-    </script>
+    </script> -->
+    <script type="text/javascript">
+        [
+          './chess.js',
+        ].forEach(function(src) {
+          var script = document.createElement('script');
+          script.src = src;
+          script.async = false; 
+          document.head.appendChild(script);
+        });
+        </script>
 
 </html>

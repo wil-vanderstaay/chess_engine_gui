@@ -23,8 +23,19 @@ function nand_bitboards(bitboard1, bitboard2) {
     return [bitboard1[0] & ~bitboard2[0], bitboard1[1] & ~bitboard2[1]]
 }
 
-function get_bit(bitboard, i) { return (bitboard[+(i >= 32)] & (1 << (i & 31))) ? 1 : 0; }
-function set_bit(bitboard, i) { bitboard[+(i >= 32)] |= (1 << (i & 31)); }
+function get_bit(bitboard, i) { 
+    if (i & 32) {
+        return (bitboard[1] & (1 << (i & 31))) ? 1 : 0;
+    }
+    return (bitboard[0] & (1 << i)) ? 1 : 0;
+}
+function set_bit(bitboard, i) { 
+    if (i & 32) {
+        bitboard[1] |= (1 << (i & 31));
+    } else {
+        bitboard[0] |= (1 << i);
+    }
+}
 function pop_bit(bitboard, i) {
     let bit = get_bit(bitboard, i);
     if (bit) { bitboard[+(i >= 32)] ^= (1 << (i & 31)); }
@@ -71,7 +82,7 @@ function print_bitboard(bitboard) {
     let res = "";
     for (let i = 0; i < 8; i++) {
         for (let j = 0; j < 8; j++) {
-            res += get_bit(bitboard, (i << 3) + j) ? "1 " : "0 ";
+            res += ["0 ", "1 "][get_bit(bitboard, (i << 3) + j)];
         }
         res += "\n";
     }
@@ -125,9 +136,9 @@ function get_move_enpassant(move) { return move & 4194304; }
 function get_move_castle(move) { return move & 8388608; }
 function get_move_uci(move) { 
     if (!move) { return ""; }
-    let letters = " nbrq";
+    let letters = ["", "n", "b", "r", "q"];
     let promote = get_move_promote(move) % 6;
-    return square_name(get_move_source(move)) + square_name(get_move_target(move)) + (promote ? letters[promote] : ""); 
+    return square_name(get_move_source(move)) + square_name(get_move_target(move)) + letters[promote]; 
 }
 function get_move_san(move, board_inst, disambiguate=true) { 
     if (!move) { return ""; }
@@ -141,7 +152,7 @@ function get_move_san(move, board_inst, disambiguate=true) {
     let promote = get_move_promote(move);
     let capture = get_move_capture(move);
 
-    if (get_move_castle(move)) { return (source < target) ? "O-O" : "O-O-O"; }
+    if (get_move_castle(move)) { return ["O-O-O", "O-O"][+(source < target)]; }
     
     res += letters[piece % 6];
     if (!res && capture) { res += uci[0]; }
@@ -189,10 +200,47 @@ function print_move(move) {
 }
 //#endregion
 
+// TIMER
+class Timer {
+    constructor(time, html_id) {
+        this.timer = time;
+        this.checkpoint = 0;
+        this.interval = 0;
+        this.html_id = html_id;
+
+        document.getElementById(this.html_id).innerHTML = Math.round(this.timer / 1000);
+    }
+
+    elapsed_this_turn() {
+        return this.checkpoint ? Math.round(performance.now() - this.checkpoint) : 0;
+    }
+
+    remaining() {
+        return Math.round(this.timer - this.elapsed_this_turn());
+    }
+
+    start() {
+        let checkpoint = performance.now();
+        let timer = this.timer;
+        let id = this.html_id;
+
+        this.checkpoint = checkpoint;
+        this.interval = setInterval(function () {
+            document.getElementById(id).innerHTML = Math.round((timer + checkpoint - performance.now()) / 1000);
+        }, 500);
+    }
+
+    stop() {
+        clearInterval(this.interval);
+        this.timer = Math.round(this.timer - this.elapsed_this_turn());
+        this.checkpoint = 0;
+        document.getElementById(this.html_id).innerHTML = Math.round(this.timer / 1000);
+    }
+}
+
 // BOT ----------------------------------------------------------------------------------------------------------------------
 class Bot {
     constructor() {
-
     }
 
     evaluate(board) {
@@ -201,7 +249,7 @@ class Bot {
             res += count_bits(board.bitboards[i]);
             res -= count_bits(board.bitboards[i + 6]);
         }
-        return (board.turn) ? -res : res;
+        return [res, -res][board.turn];
     }
 
     score_move(board, move) {
@@ -251,7 +299,11 @@ class Bot {
 
     think(board) {
         let moves = board.generate_moves();
-        return moves[0];
+        let n = Math.floor(Math.random() * moves.length);
+        for (let i = 0; i < 200000000; i++) {
+            n = Math.floor(Math.random() * moves.length);
+        }
+        return moves[n];
     }
 }
 
@@ -292,7 +344,7 @@ class Move_Helper {
         11, 10, 10, 10, 10, 10, 10, 11, 
         11, 10, 10, 10, 10, 10, 10, 11, 
         12, 11, 11, 11, 11, 11, 11, 12
-    ];
+    ]; 
     BISHOP_MAGICS = [ // [square]
         [2155905152, 4198400],
         [33587200, 262408],
@@ -303,7 +355,7 @@ class Move_Helper {
         [538968064, 16898],
         [67175424, 131204],
         [268501504, 4098],
-        [67371152, 1025],
+        [67371072, 516],
         [2155937792, 4096],
         [8388608, 1028],
         [536870912, 1028],
@@ -313,32 +365,32 @@ class Move_Helper {
         [33817600, 524352],
         [67371072, 262176],
         [8519688, 131088],
-        [33570816, 8421384],
+        [2181054464, 524288],
         [10485760, 32772],
         [9439232, 8194],
         [16850944, 65538],
         [4260864, 65538],
         [537002496, 2101248],
-        [537133320, 69632],
+        [34079232, 1049600],
         [268468256, 10240],
         [134250498, 131200],
-        [8396802, 33792],
+        [16793600, 65552],
         [4259968, 524800],
-        [570950656, 32896],
+        [33686016, 524352],
         [4211200, 262400],
-        [4196864, 266248],
-        [1049088, 536907784],
+        [2105344, 133124],
+        [1048832, 69640],
         [131104, 133124],
         [537395712, 8320],
-        [1074004032, 18688],
-        [28672, 132097],
+        [537002016, 4194432],
+        [65600, 131202],
         [2147616768, 66048],
-        [1073774656, 279552],
+        [1073873408, 131136],
         [67125248, 66576],
         [33556480, 131344],
         [603981824, 5120],
         [402653440, 32],
-        [136315136, 16388],
+        [67108928, 2049],
         [1077936256, 4198400],
         [8389120, 2097410],
         [2181038208, 524416],
@@ -358,12 +410,12 @@ class Move_Helper {
         [537133312, 4],
         [17039488, 16392],
         [33571328, 135170]
-    ];
+    ]; 
     ROOK_MAGICS = [ // [square]
         [4194336, 8392832],
         [4202496, 4194320],
         [8392704, 8390688],
-        [16785412, 16779280],
+        [524416, 8389648],
         [2147745794, 8390656],
         [134349056, 16778240],
         [16777728, 8388736],
@@ -375,33 +427,33 @@ class Move_Helper {
         [262272, 32776],
         [8389120, 32772],
         [8388864, 32770],
-        [20608, 32769],
+        [1082130688, 32768],
         [2113536, 32896],
         [2097216, 1048640],
         [268443648, 32896],
         [134221824, 32896],
         [67110912, 557184],
-        [33555456, 98432],
+        [33555456, 32896],
         [131076, 257],
-        [37814404, 512],
+        [8454212, 512],
         [2147516448, 16384],
         [2155880448, 16384],
         [2148532352, 8192],
         [2155874304, 4096],
         [2155873280, 2048],
-        [2147614848, 67109888],
+        [2147745920, 512],
         [131076, 65537],
         [2147500288, 294912],
         [4202496, 8388672],
         [4202496, 16400],
-        [8396928, 2097168],
+        [2155880448, 4096],
         [2155876352, 2048],
         [8390656, 32772],
-        [8391168, 32772],
+        [8389632, 32770],
         [16777728, 65540],
-        [33554497, 132],
+        [1082130688, 32768],
         [2147516448, 16384],
-        [536903808, 134234112],
+        [4210688, 1048608],
         [1114176, 65568],
         [134250512, 1048704],
         [134250624, 1024],
@@ -414,11 +466,11 @@ class Move_Helper {
         [268468352, 2048],
         [2147745920, 2048],
         [131200, 32772],
-        [131200, 2147516417],
-        [49280, 32769],
+        [262400, 65538],
+        [16512, 32769],
         [2147549201, 16416],
         [272629889, 8448],
-        [4196609, 135200],
+        [151003137, 16400],
         [2701133829, 4096],
         [100927489, 65552],
         [524805, 65540],
@@ -430,8 +482,6 @@ class Move_Helper {
     BISHOP_ATTACKS = this.bishop_attack();
     ROOK_ATTACKS = this.rook_attack();
     
-    constructor() {}
-
     get_occupancy(index, free_bits_in_mask, attack_mask) {
         let res = [0, 0];
         let mask = copy_bitboard(attack_mask);
@@ -659,21 +709,22 @@ class Move_Helper {
     }
 
     improve_magic(square, is_bishop, n=100000) {
-        let best_magic = is_bishop ? this.BISHOP_MAGICS[square] : this.ROOK_MAGICS[square];
+        let best_magic = [this.ROOK_MAGICS[square], this.BISHOP_MAGICS[square]][is_bishop];
         let best_magic_bits = count_bits(best_magic);
         // if (best_magic_bits <= 6) { return best_magic; } // focus on magics > x
 
-        let relevant_bits = is_bishop ? this.BISHOP_RELEVANT_BITS[square] : this.ROOK_RELEVANT_BITS[square];
+        let relevant_bits = [this.ROOK_RELEVANT_BITS[square], this.BISHOP_RELEVANT_BITS[square]][is_bishop];
         let occupancy_indicies = 1 << relevant_bits;
-        let attack_mask = is_bishop ? this.mask_bishop_attacks(square) : this.mask_rook_attacks(square)
+        let attack_mask = is_bishop ? this.mask_bishop_attacks(square) : this.mask_rook_attacks(square);
 
-        let max_occupancies = is_bishop ? 512 : 4096;
+        let max_occupancies = [4096, 512][is_bishop];
+        let slide_start = [0, 4][is_bishop];
         let occupancies = new Array(max_occupancies);
         let attacks = new Array(max_occupancies);
         let used_attacks = new Array(max_occupancies);
         for (let i = 0; i < occupancy_indicies; i++) {
             occupancies[i] = this.get_occupancy(i, relevant_bits, attack_mask); 
-            attacks[i] = is_bishop ? this.sliding_moves(square, occupancies[i], 4, 8) : this.sliding_moves(square, occupancies[i], 0, 4);
+            attacks[i] = this.sliding_moves(square, occupancies[i], slide_start, slide_start + 4);
         }
 
         for (; n > 0; n--) {
@@ -697,7 +748,7 @@ class Move_Helper {
             if (!fail) {
                 best_magic = magic;
                 best_magic_bits = bits;
-                console.log((is_bishop ? "B" : "R") + " - FOUND " + (bits) + " - [" + (best_magic[0]) + "," + (best_magic[1]) + "]");
+                console.log(("RB"[is_bishop]) + " - FOUND " + (bits) + " - [" + (best_magic[0]) + "," + (best_magic[1]) + "]");
             }
         }
         if (best_magic[0] < 0 || best_magic[1] < 0) {
@@ -707,6 +758,8 @@ class Move_Helper {
     }
 
     improve_all_magics(n=100000) {
+        let b = [];
+        let r = [];
         for (let i = 0; i < 64; i++) {
             let bm = this.improve_magic(i, 1, n);
             let rm = this.improve_magic(i, 0, n);
@@ -715,10 +768,13 @@ class Move_Helper {
             rm[0] = rm[0].toString().padStart(10, " ");
             rm[1] = rm[1].toString().padStart(10, " ");
             console.log((i) + " - [" + bm[0] + "," + bm[1] + "],[" + rm[0] + "," + rm[1] + "]");
+            b.push(bm);
+            r.push(rm);
         }
+        this.format_magics(b, r);
     }
 
-    format_magics() {
+    format_magics(bishops, rooks) {
         function format_arr(arr, name) {
             let res = "let " + name + " = [";
             for (let i = 0; i < 64; i++) {
@@ -731,26 +787,54 @@ class Move_Helper {
             res += "];"
             return res;
         }
-        document.getElementById("bishop").innerText = format_arr(this.BISHOP_MAGICS, "FINAL_BISHOP_MAGICS");
-        document.getElementById("rook").innerText = format_arr(this.ROOK_MAGICS, "FINAL_ROOK_MAGICS");
+        console.log(format_arr(bishops, "BISHOP_MAGICS"));
+        console.log(format_arr(rooks, "ROOK_MAGICS"));
+    }
+
+    test_magics(n=1000) {
+        for (let i = 0; i < 64; i++) {
+            for (let j = 0; j < n; j++) {
+                let occ = and_bitboards(this.random_64(), this.random_64());
+                let b1 = this.get_bishop_attack(i, occ);
+                let r1 = this.get_rook_attack(i, occ);
+                let b2 = this.sliding_moves(i, occ, 4, 8);
+                let r2 = this.sliding_moves(i, occ, 0, 4);
+                if (b1[0] != b2[0] || b1[1] != b2[1]) {
+                    console.log((i) + " BISHOP WRONG");
+                    print_bitboard(occ);
+                    print_bitboard(b1);
+                    print_bitboard(b2);
+                    return "FAIL";
+                }
+                if (r1[0] != r2[0] || r1[1] != r2[1]) {
+                    console.log((i) + " ROOK WRONG");
+                    print_bitboard(occ);
+                    print_bitboard(r1);
+                    print_bitboard(r2);
+                    return "FAIL";
+                }
+            }
+        }
+        return "PASS";
     }
     //#endregion
 }
 
 // BOARD ----------------------------------------------------------------------------------------------------------------------
 class Board {
+    helper = new Move_Helper();
+
     constructor(fen) {
         /*
             this.helper - piece constants, magic bitboards etc.
             this.squares - 64 array of pieces, index offset by 1 for 0=none
             this.bitboards - 15 bitboards - 6 white, 6 black, 3 occupancy
-            this.turn
+            this.turn - w = 0, b = 1
             this.castle
             this.enpassant
             this.fifty
         */
 
-        this.helper = new Move_Helper();
 
         // BITBOARDS 
         this.squares = new Array(64).fill(0);
@@ -820,7 +904,7 @@ class Board {
         // Pawn moves
         let piece = 6 * this.turn;
         let piece_board = copy_bitboard(this.bitboards[piece]);
-        let pawn_direction = this.turn ? 8 : -8;
+        let pawn_direction = [-8, 8][this.turn];
     
         let curr_occ = 12 + this.turn;
         let opp_occ = 12 + (this.turn ^ 1);
@@ -861,11 +945,14 @@ class Board {
                 } else {
                     moves.push(create_move(source, att, piece, 0, 1));
                 }
-    
             }
-            // En passant
-            if (this.enpassant && get_bit(this.helper.PAWN_ATTACK[this.turn][source], this.enpassant)) {
-                    moves.push(create_move(source, this.enpassant, piece, 0, 1, 0, 1));
+        }
+        // En passant
+        if (this.enpassant) {
+            piece_board = and_bitboards(this.helper.PAWN_ATTACK[this.turn ^ 1][this.enpassant], this.bitboards[piece]);
+            while (bool_bitboard(piece_board)) {
+                let source = pop_lsb_index(piece_board);
+                moves.push(create_move(source, this.enpassant, piece, 0, 1, 0, 1));
             }
         }
         // Knight moves
@@ -925,11 +1012,11 @@ class Board {
 
         // Castling
         if (this.castle) {
-            let king_pos = this.turn ? 4 : 60;
-            if ((this.turn ? this.castle & 4 : this.castle & 1) && !get_bit(this.bitboards[14], king_pos + 1) && !get_bit(this.bitboards[14], king_pos + 2) && !this.is_square_attacked(king_pos, this.turn ^ 1) && !this.is_square_attacked(king_pos + 1, this.turn ^ 1)) {
+            let king_pos = [60, 4][this.turn];
+            if (([this.castle & 1, this.castle & 4][this.turn]) && !get_bit(this.bitboards[14], king_pos + 1) && !get_bit(this.bitboards[14], king_pos + 2) && !this.is_square_attacked(king_pos, this.turn ^ 1) && !this.is_square_attacked(king_pos + 1, this.turn ^ 1)) {
                 moves.push(create_move(king_pos, king_pos + 2, piece, 0, 0, 0, 0, 1));
             }
-            if ((this.turn ? this.castle & 8 : this.castle & 2) && !get_bit(this.bitboards[14], king_pos - 1) && !get_bit(this.bitboards[14], king_pos - 2) && !get_bit(this.bitboards[14], king_pos - 3) && !this.is_square_attacked(king_pos, this.turn ^ 1) && !this.is_square_attacked(king_pos - 1, this.turn ^ 1)) {
+            if (([this.castle & 2, this.castle & 8][this.turn]) && !get_bit(this.bitboards[14], king_pos - 1) && !get_bit(this.bitboards[14], king_pos - 2) && !get_bit(this.bitboards[14], king_pos - 3) && !this.is_square_attacked(king_pos, this.turn ^ 1) && !this.is_square_attacked(king_pos - 1, this.turn ^ 1)) {
                 moves.push(create_move(king_pos, king_pos - 2, piece, 0, 0, 0, 0, 1));
             }
         }
@@ -985,15 +1072,8 @@ class Board {
         set_bit(this.bitboards[14], target);
     
         // Set promote piece
-        if (get_move_promote(move)) {
-            let promote_piece = get_move_promote(move);
-            if (promote_piece == 15) { // reserved for player promote piece
-                let input = window.prompt("N B R Q: ").toUpperCase() + " ";
-                let value = "NBRQ".indexOf(input[0]) + 1;
-                if (!value) { value = 4; }
-                promote_piece = piece + value;
-                move = (move & 15794175) | (promote_piece << 16);
-            }
+        let promote_piece = get_move_promote(move);
+        if (promote_piece) {
             pop_bit(this.bitboards[piece], target);
             set_bit(this.bitboards[promote_piece], target);
             this.squares[target] = promote_piece + 1;
@@ -1023,7 +1103,7 @@ class Board {
         } 
         
         // Set enpassant
-        this.enpassant = get_move_double(move) ? target + 8 - (this.turn << 4) : 0;
+        this.enpassant = [0, target + 8 - (this.turn << 4)][get_move_double(move)];
     
         // Update castle
         this.castle &= this.helper.CASTLING_RIGHTS[source];
@@ -1074,21 +1154,41 @@ class Board {
         console.log(res);
     }
 
-    perft(depth, print=false) {
+    copy_bitboards() {
+        let res = [];
+        let bitboards = this.bitboards;
+        for (let i = 0; i < bitboards.length; i++) {
+            res.push(copy_bitboard(bitboards[i]));
+        }
+        return res;
+    }
+
+    perft(depth, print=true) {
         if (depth == 0) { return 1; }
         let res = 0;
         let moves = this.generate_moves();
         for (let i = 0; i < moves.length; i++) {
             let move = moves[i];
+
+            let sq = this.squares;
+            let bi = this.copy_bitboards();
+            let tu = this.turn;
+            let ca = this.castle;
+            let en = this.enpassant;
+
             this.do_move(move);
 
             let start_res = res;
-            res += this.perft(depth - 1);
+            res += this.perft(depth - 1, false);
             if (print) {
                 console.log(get_move_uci(move) + "\t->\t" + (res - start_res));
             }
 
-            this.undo_move(move);
+            this.squares = sq;
+            this.bitboards = bi;
+            this.turn = tu;
+            this.castle = ca;
+            this.enpassant = en;
         }
         return res;
     }
@@ -1098,15 +1198,19 @@ class Board {
 class Game {
     START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-    constructor(playerWhite, fen=this.START_FEN) {
+    constructor(playerWhite, time=10*60*1000, fen=this.START_FEN) {
         this.playerWhite = playerWhite;
         this.board = new Board(fen);
-        this.bot = new Bot();
         this.moves = [];
+
+        this.playerTimer = new Timer(time, "playerTimer");
+        this.botTimer = new Timer(time, "botTimer");
+        this.bot = new Bot();
+
         this.make_table();
         this.display();
 
-        if (!this.playerWhite) { 
+        if (this.board.turn == +this.playerWhite) { 
             this.do_ai_move();
         }
     }
@@ -1117,12 +1221,12 @@ class Game {
 
     make_table() {
         let table = '<table id="chess-table" class="chess-board">';
-        let row_order = this.playerWhite ? "87654321" : "12345678";
-        let col_order = this.playerWhite ? "abcdefgh" : "hgfedcba";
+        let row_order = ["12345678", "87654321"][+this.playerWhite];
+        let col_order = ["hgfedcba", "abcdefgh"][+this.playerWhite];
         for (let row = 0; row < 8; row++) {
             table += '<tr>';
             for (let col = 0; col < 8; col++) {
-                let colour_class = ((row + col) % 2) ? 'dark' : 'light';
+                let colour_class = ['light', 'dark'][((row + col) % 2)];
                 table += '<td id="s' + ((row << 3) + col) + '" class="' + colour_class + '">';
                 if (col == 0) {
                     table += '<div style="position: absolute; top: -1px; left: 0px;">' + row_order[row] + '</div>';
@@ -1147,12 +1251,20 @@ class Game {
             document.getElementById("s" + (source)).className += " highlight";
             document.getElementById("s" + (target)).className += " highlight";
             if (get_move_promote(move)) { // ask for promote input
-                move |= 983040; // set promote 15
+                let input = window.prompt("N B R Q: ").toUpperCase() + " ";
+                let value = "NBRQ".indexOf(input[0]) + 1;
+                if (!value) { value = 4; }
+                let promote_piece = get_move_piece(move) + value;
+                move = (move & 15794175) | (promote_piece << 16);
             }
             this.board.do_move(move);
             this.moves.push(move);
-            this.display(true);
-            this.do_ai_move();
+            this.display();
+
+            this.playerTimer.stop();
+            this.botTimer.start();
+
+            window.setTimeout(() => this.do_ai_move(), 10);
             return true;
         }
         return false;
@@ -1163,6 +1275,9 @@ class Game {
         this.board.do_move(move);
         this.moves.push(move);
         this.display();
+
+        this.botTimer.stop();
+        this.playerTimer.start();
     }
 
     display() {
@@ -1272,11 +1387,10 @@ class Game {
                         let new_pos = legal_moves[i][1];
                         document.getElementById("s" + (new_pos)).onclick = () => {
                             let row_diff = (new_pos >> 3) - (pos >> 3);
-                            let col_diff = Math.round(div.offsetLeft / width);
+                            let col_diff = (new_pos & 7) - (pos & 7);
                             div.style.top = (width * row_diff + top_offset) + "px";
                             div.style.left = (width * col_diff + left_offset) + "px";
-
-                            game_inst.do_player_move(pos, new_pos);
+                            window.setTimeout(() => game_inst.do_player_move(pos, new_pos), 10);
                         }
                     }
                 }
@@ -1301,9 +1415,9 @@ class Game {
             if (piece_location.hasChildNodes()) { piece_location.removeChild(piece_location.childNodes[0]); }
             piece_location.style.background = "";
 
-            let b = (this.playerWhite) ? i : 63 - i;
+            let b = [63 - i, i][+this.playerWhite]
             let j = this.board.squares[b];
-            if (j) {
+            if (j) { 
                 j--;
                 let piece = '<img draggable="false" style="width: ' + (width - 10) + 'px; height: ' + (width - 10) + 'px;" src="../imgs/chess_pieces/' + (j) + '.png">';
                         
@@ -1327,4 +1441,5 @@ class Game {
     }
 }
 
-let game = new Game(false);
+// let game = new Game(true, 10000, "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
+let game = new Game(true);

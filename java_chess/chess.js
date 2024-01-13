@@ -868,10 +868,15 @@ function generate_pseudo_moves() {
             }
 
         }
-        // En passant
-        if (EN_PASSANT_SQUARE && get_bit(PAWN_ATTACK[TURN][source], EN_PASSANT_SQUARE)) {
-                moves.push(create_move(source, EN_PASSANT_SQUARE, piece, 0, 1, 0, 1));
+    }
+    // En passant
+    if (EN_PASSANT_SQUARE) {
+        piece_board = and_bitboards(PAWN_ATTACK[TURN ^ 1][EN_PASSANT_SQUARE], BOARD[piece]);
+        if (bool_bitboard(piece_board)) {
+            let source = pop_lsb_index(piece_board);
+            moves.push(create_move(source, EN_PASSANT_SQUARE, piece, 0, 1, 0, 1));
         }
+
     }
     // Knight moves
     piece++;
@@ -3070,6 +3075,7 @@ function start_game(whiteDown, fen=START_FEN) {
 }
 
 let START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+START_FEN = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
 
 let NUM_SQUARES_EDGE;
 let DIR_OFFSETS;
