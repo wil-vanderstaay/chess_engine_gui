@@ -305,7 +305,7 @@ class Bot {
     
             board.do_move(move);
             let score = -this.search(board, depth - 1, -beta, -alpha);
-            board.undo_move(move);
+            board.undo_move();
             
             if (score > alpha) {
                 alpha = score;
@@ -401,7 +401,7 @@ class Move_Helper {
         [2105344, 133124],
         [1048832, 69640],
         [131104, 133124],
-        [537395712, 8320],
+        [2148008064, 512],
         [537002016, 4194432],
         [65600, 131202],
         [2147616768, 66048],
@@ -452,7 +452,7 @@ class Move_Helper {
         [2097216, 1048640],
         [268443648, 32896],
         [134221824, 32896],
-        [67110912, 557184],
+        [134218752, 32896],
         [33555456, 32896],
         [131076, 257],
         [8454212, 512],
@@ -463,7 +463,7 @@ class Move_Helper {
         [2155873280, 2048],
         [2147745920, 512],
         [131076, 65537],
-        [2147500288, 294912],
+        [2147500288, 32768],
         [4202496, 8388672],
         [4202496, 16400],
         [2155880448, 4096],
@@ -474,8 +474,8 @@ class Move_Helper {
         [1082130688, 32768],
         [2147516448, 16384],
         [4210688, 1048608],
-        [1114176, 65568],
-        [134250512, 1048704],
+        [536903808, 4096],
+        [134250624, 4096],
         [134250624, 1024],
         [33587328, 1024],
         [65792, 1026],
@@ -491,11 +491,11 @@ class Move_Helper {
         [2147549201, 16416],
         [272629889, 8448],
         [151003137, 16400],
-        [2701133829, 4096],
-        [100927489, 65552],
-        [524805, 65540],
-        [2281767428, 4096],
-        [1141014562, 256]
+        [553652225, 2052],
+        [34605057, 65540],
+        [133121, 65540],
+        [33554561, 65540],
+        [16785538, 68]
     ];
     static BISHOP_MASKS = this.mask_all_bishop_attacks();
     static ROOK_MASKS = this.mask_all_rook_attacks();
@@ -728,10 +728,34 @@ class Move_Helper {
         return res;
     }
 
-    static improve_magic(square, is_bishop, n=100000) {
+    static ncr_next(n, r, prev) { 
+        /* 
+            let indicies = [...new Array(r).keys()];
+            for (i in nCr) {
+                this.ncr_next(n, r, indicies);
+                let magic = [0, 0];
+                indicies.map(item => set_bit(magic, item));
+            }
+        */
+        if (prev[r - 1] < n - 1) { 
+            prev[r - 1]++; 
+        } else {
+            let i = r - 2;
+            while (i > 0 && prev[i] + 1 == prev[i + 1]) {
+                i--;
+            }
+            prev[i]++;
+            for (i++; i < r; i++) {
+                prev[i] = prev[i - 1] + 1;
+            }
+        }
+    }
+
+    // 64c4 = 635376
+    static improve_magic(square, is_bishop, n=100000, ignoreBits=10) {
         let best_magic = [this.ROOK_MAGICS[square], this.BISHOP_MAGICS[square]][is_bishop];
         let best_magic_bits = count_bits(best_magic);
-        // if (best_magic_bits <= 6) { return best_magic; } // focus on magics > x
+        if (best_magic_bits <= ignoreBits) { return best_magic; } // focus on magics > x
 
         let relevant_bits = [this.ROOK_RELEVANT_BITS[square], this.BISHOP_RELEVANT_BITS[square]][is_bishop];
         let occupancy_indicies = 1 << relevant_bits;
@@ -777,12 +801,12 @@ class Move_Helper {
         return best_magic;
     }
 
-    static improve_all_magics(n=100000) {
+    static improve_all_magics(n=100000, ignoreBits=10) {
         let b = [];
         let r = [];
         for (let i = 0; i < 64; i++) {
-            let bm = this.improve_magic(i, 1, n);
-            let rm = this.improve_magic(i, 0, n);
+            let bm = this.improve_magic(i, 1, n, ignoreBits);
+            let rm = this.improve_magic(i, 0, n, ignoreBits);
             bm[0] = bm[0].toString().padStart(10, " ");
             bm[1] = bm[1].toString().padStart(10, " ");
             rm[0] = rm[0].toString().padStart(10, " ");
@@ -906,13 +930,16 @@ class Board {
 
         // OTHERS
         this.capturedPiece = 0;
+        this.moves = [0];
+        this.gameStates = [new Game_State(this.capturedPiece, this.enpassant, this.castle, this.fifty)];
     }
 
     get_game_state() {
-        return new Game_State(this.capturedPiece, this.enpassant, this.castle, this.fifty);
+        return this.gameStates[this.gameStates.length - 1];
     }
 
-    load_game_state(gameState) {
+    load_game_state() {
+        let gameState = this.get_game_state();
         this.capturedPiece = gameState.capturedPiece;
         this.enpassant = gameState.enpassant;
         this.castle = gameState.castle;
@@ -1085,6 +1112,7 @@ class Board {
         let opp_occ = 13 - this.turn;
     
         // Remove captured piece and enpassant
+        this.capturedPiece = 0;
         if (get_move_capture(move)) {
             let capture_square = get_move_enpassant(move) ? [target + 8, target - 8][this.turn] : target;
             this.capturedPiece = this.squares[capture_square];
@@ -1136,15 +1164,22 @@ class Board {
         this.castle &= Move_Helper.CASTLING_RIGHTS[source];
         this.castle &= Move_Helper.CASTLING_RIGHTS[target];
 
-        // Moving into check, reset state
-        // TODO
-
         this.turn ^= 1;
+        this.moves.push(move);
+        this.gameStates.push(new Game_State(this.capturedPiece, this.enpassant, this.castle, this.fifty));
+
+        // Moving into check, reset state
+        if (this.is_square_attacked(lsb_index(this.bitboards[11 - 6 * this.turn]), this.turn)) {
+            this.undo_move();
+            return false;
+        }
         return true;
     }
 
-    undo_move(move) {
-        if (!move) { return false; }
+    undo_move() {
+        if (this.moves.length <= 1) { return; }
+        let move = this.moves.pop();
+
         let source = get_move_source(move);
         let target = get_move_target(move);
         let piece = get_move_piece(move);
@@ -1173,11 +1208,9 @@ class Board {
         this.squares[target] = 0;
 
         // Reset captured piece and enpassant
-        this.enpassant = 0;
         if (get_move_capture(move)) {
             let enpassant = get_move_enpassant(move) ? 1 : 0;
             let capture_square = [target, target + 8 - (this.turn << 4)][enpassant];
-            this.enpassant = [0, target][enpassant];
 
             this.squares[target] = this.capturedPiece;
             set_bit(this.bitboards[this.capturedPiece - 1], capture_square);
@@ -1201,41 +1234,39 @@ class Board {
         } 
 
         this.turn ^= 1;
+        this.gameStates.pop()
+        this.load_game_state();
         return true;
     }
 
     print_board() {
         let letters = "PNBRQKpnbrqk";
-        let res = "";
+        let bitboardRes = "";
+        let squaresRes = "";
         for (let i = 0; i < 8; i++) {
             for (let j = 0; j < 8; j++) {
                 let k = (i << 3) + j;
+                
+                let piece = "-";
                 if (get_bit(this.bitboards[14], k)) {
                     for (let p = 0; p < 12; p++) {
                         if (get_bit(this.bitboards[p], k)) {
-                            res += letters[p] + " ";
+                            piece = letters[p];
                             break;
                         }
                     }
-                } else {
-                    res += "- ";
                 }
+                bitboardRes += piece + " ";
+                
+                piece = this.squares[k];
+                piece = piece ? letters[piece - 1] : "-";
+                squaresRes += piece + " ";
             }
-            res += "\n";
+            bitboardRes += "\n";
+            squaresRes += "\n";
         }
-        console.log(res);
-
-        res = "";
-        for (let i = 0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-                let k = (i << 3) + j;
-                let piece = this.squares[k].toString();
-                if (piece.length == 1) { piece = " " + piece; } 
-                res += piece + " ";
-            }
-            res += "\n";
-        }
-        console.log(res);
+        console.log(bitboardRes);
+        console.log(squaresRes);
     }
 
     copy_bitboards() {
@@ -1253,14 +1284,10 @@ class Board {
         let moves = this.generate_moves();
         for (let i = 0; i < moves.length; i++) {
             let move = moves[i];
-
-            let sq = this.squares;
-            let bi = this.copy_bitboards();
-            let tu = this.turn;
-            let ca = this.castle;
-            let en = this.enpassant;
-
-            this.do_move(move);
+            
+            if (!this.do_move(move)) {
+                continue;
+            }
 
             let start_res = res;
             res += this.perft(depth - 1, false);
@@ -1268,11 +1295,7 @@ class Board {
                 console.log(get_move_uci(move) + "\t->\t" + (res - start_res));
             }
 
-            this.squares = sq;
-            this.bitboards = bi;
-            this.turn = tu;
-            this.castle = ca;
-            this.enpassant = en;
+            this.undo_move();
         }
         return res;
     }
@@ -1288,8 +1311,6 @@ class Game {
         this.playerWhite = playerWhite;
 
         this.board = new Board(this.fen);
-        this.moves = [0];
-        this.game_states = [this.board.get_game_state()];
 
         Game.PLAYER_TIMER_INTERVALS.map((item) => clearInterval(Game.PLAYER_TIMER_INTERVALS.pop()));
 
@@ -1306,10 +1327,8 @@ class Game {
     }
 
     undo() {
-        for (let i = 0; i < 2 && this.moves.length > 1; i++) {
-            this.board.undo_move(this.moves.pop());
-            this.board.load_game_state(this.game_states.pop());
-        }
+        this.board.undo_move();
+        this.board.undo_move();
         this.display(true);
     }
 
@@ -1323,10 +1342,10 @@ class Game {
                 let colour_class = ['light', 'dark'][((row + col) % 2)];
                 table += '<td id="s' + ((row << 3) + col) + '" class="' + colour_class + '">';
                 if (col == 0) {
-                    table += '<div style="position: absolute; top: -1px; left: 0px;">' + row_order[row] + '</div>';
+                    table += '<div class="label" style="position: absolute; top: -1px; left: 0px;">' + row_order[row] + '</div>';
                 }
                 if (row == 7) {
-                    table += '<div style="position: absolute; bottom: -1px; right: 2px;">' + col_order[col] + '</div>';
+                    table += '<div class="label" style="position: absolute; bottom: -1px; right: 2px;">' + col_order[col] + '</div>';
                 }
                 table += '</td>';
             }
@@ -1350,8 +1369,6 @@ class Game {
                 move = (move & 15794175) | (promote_piece << 16);
             }
             this.board.do_move(move);
-            this.moves.push(move); // TODO: maybe move the moves and game_states out to board? Then handle push/pop in make and unmake
-            this.game_states.push(this.board.get_game_state());
             this.display();
 
             this.playerTimer.stop();
@@ -1371,8 +1388,6 @@ class Game {
         clearInterval(Game.PLAYER_TIMER_INTERVALS.pop());
         let move = this.bot.think(this.board);
         this.board.do_move(move);
-        this.moves.push(move);
-        this.game_states.push(this.board.get_game_state());
         this.display();
 
         this.botTimer.stop();
@@ -1501,7 +1516,7 @@ class Game {
             let interval = setInterval(function() {
                 playerTimer.update();
                 botTimer.update();
-            }, 1000);
+            }, 300);
             Game.PLAYER_TIMER_INTERVALS.push(interval);
         }
         // Update board
@@ -1509,7 +1524,7 @@ class Game {
         let s = document.getElementById("s0").getBoundingClientRect();
         let width = s.right - s.left;
 
-        let last_move = this.moves[this.moves.length - 1];
+        let last_move = this.board.moves[this.board.moves.length - 1];
         let last_move_source = get_move_source(last_move);
         let last_move_target = get_move_target(last_move);
         let legal_moves = this.board.generate_moves().map(move => [get_move_source(move), get_move_target(move)]);
@@ -1549,7 +1564,10 @@ class Game {
             let i = indicies[index];
             let piece_location = table.rows.item(i >> 3).cells.item(i & 7);
 
-            if (piece_location.hasChildNodes()) { piece_location.removeChild(piece_location.childNodes[0]); }
+            if (piece_location.hasChildNodes()) {
+                let index = piece_location.childNodes.length > 1 && piece_location.childNodes[0].className == "label" ? 1 : 0;
+                piece_location.removeChild(piece_location.childNodes[index]); 
+            }
             piece_location.style.background = "";
 
             let b = [63 - i, i][+this.playerWhite];
@@ -1584,8 +1602,9 @@ function new_game() { game = new Game(true); }
 function switch_sides() { game = new Game(!game.playerWhite, game.fen); }
 //#endregion
 
-// let game = new Game(true);
-// let game = new Game(true, 10000, "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
+let game = new Game(true);
+// let game = new Game(false, "rnbqkbnr/pppppppp/8/8/8/1P6/P1PPPPPP/RNBQKBNR b KQkq - 0 1");
+// let game = new Game(true, "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
 // let game = new Game(true, "rnbqkbnr/ppppp1pp/8/4Pp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 1"); // white enpassant
-let game = new Game(false, "rnbqkbnr/pp1ppppp/8/4P3/2pP4/8/PPP2PPP/RNBQKBNR b KQkq d3 0 3"); // black enpassant
+// let game = new Game(false, "rnbqkbnr/pp1ppppp/8/4P3/2pP4/8/PPP2PPP/RNBQKBNR b KQkq d3 0 3"); // black enpassant
 window.onresize = () => { game.display(true); };
