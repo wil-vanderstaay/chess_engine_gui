@@ -132,6 +132,7 @@ function get_move_source(move) { return move & 63; }
 function get_move_target(move) { return (move & 4032) >> 6; }
 function get_move_piece(move) { return (move & 61440) >> 12; }
 function get_move_promote(move) { return (move & 983040) >> 16; }
+function set_move_promote(move, promote_piece) { return (move & 15794175) | (promote_piece << 16); }
 function get_move_capture(move) { return move & 1048576; }
 function get_move_double(move) { return move & 2097152; }
 function get_move_enpassant(move) { return move & 4194304; }
@@ -307,7 +308,9 @@ class Bot {
         for (let i = 0; i < moves.length; i++) {
             let move = moves[i];
 
-            board.do_move(move);
+            if (!board.do_move(move)) {
+                continue;
+            }
             let score = -this.search(board, depth - 1, -beta, -alpha);
             board.undo_move();
 
@@ -1416,7 +1419,7 @@ class Game {
                 let value = "NBRQ".indexOf(input[0]) + 1;
                 if (!value) { value = 4; }
                 let promote_piece = get_move_piece(move) + value;
-                move = (move & 15794175) | (promote_piece << 16);
+                move = set_move_promote(move, promote_piece);
             }
             let san = get_move_san(move, this.board);
             this.moves.push(san);
@@ -1438,7 +1441,9 @@ class Game {
     }
 
     do_ai_move_delayed() {
-        clearInterval(Game.PLAYER_TIMER_INTERVALS.pop());
+        while (Game.PLAYER_TIMER_INTERVALS.length) {
+            clearInterval(Game.PLAYER_TIMER_INTERVALS.pop());
+        }
         let move = this.bot.think(this.board);
         let san = get_move_san(move, this.board);
         this.moves.push(san);
@@ -1567,15 +1572,16 @@ class Game {
         document.getElementById("loading").style.visibility = "hidden";
 
         // Update timers
-        if (this.playerWhite != this.board.turn) {
-            let playerTimer = this.playerTimer;
-            let botTimer = this.botTimer;
-            let interval = setInterval(function () {
-                playerTimer.update();
-                botTimer.update();
-            }, 300);
-            Game.PLAYER_TIMER_INTERVALS.push(interval);
-        }
+        let playerTimer = this.playerTimer;
+        let botTimer = this.botTimer;
+        playerTimer.update();
+        botTimer.update();
+        let interval = setInterval(function () {
+            playerTimer.update();
+            botTimer.update();
+        }, 300);
+        Game.PLAYER_TIMER_INTERVALS.push(interval);
+
         // Update board
         let table = document.getElementById("chess-table");
         let s = document.getElementById("s0").getBoundingClientRect();
