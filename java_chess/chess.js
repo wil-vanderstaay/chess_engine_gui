@@ -2527,7 +2527,7 @@ function get_fen() {
 
     let castle = (get_castle_wk(CASTLE) ? "K" : "") + (get_castle_wq(CASTLE) ? "Q" : "") + (get_castle_bk(CASTLE) ? "k" : "") + (get_castle_bq(CASTLE) ? "q" : "");
     if (!castle.length) { castle = "-"; }
-    let en_pass = EN_PASSANT_SQUARE ? square_index(EN_PASSANT_SQUARE) : "-";
+    let en_pass = EN_PASSANT_SQUARE ? square_name(EN_PASSANT_SQUARE) : "-";
 
     let res = ""; 
     let count = 0;
@@ -3075,7 +3075,6 @@ function start_game(whiteDown, fen=START_FEN) {
 }
 
 let START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-START_FEN = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8";
 
 let NUM_SQUARES_EDGE;
 let DIR_OFFSETS;

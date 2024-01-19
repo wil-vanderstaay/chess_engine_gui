@@ -4,7 +4,7 @@
         <title>Wil's Java Chess</title>
         <style>            
             .chess-board { border-spacing: 0; user-select: none; }
-            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 15px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
+            .chess-board td { width: min(calc(11vw - 10px), 10.9vh); height: min(calc(11vw - 18px), 10.9vh); border: 1px solid #000; font-size: 14px; font-weight: bold; position: relative;} /* Calc ensures correct dimensions when resizing */
             .chess-piece { position: absolute; z-index: 1000; }
 
             .light { background: #f1d9c0; color: #a97a65; }
@@ -15,21 +15,29 @@
             .dark.focus { background: #3e90c3 }
             .dark.highlight { background: #c59e36 }
 
-            .timer { border-style: solid; margin: 3px; text-align: center; font-size: 18px; }
+            .timer { border-style: solid; border-width: 5px; margin: 3px; text-align: center; font-weight: 600; font-size: 18px; height: 30px; line-height: 30px;}
             .timer.highlight { border-color: #32cd32; }
             .timer.expired { border-color: #ff4600; }
         </style>
     </head>
     <body>
-        <div style="display: flex; justify-content: center; align-items: center; min-height: 94vh;">
-            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;">
+        <div style="display: flex; justify-content: center; align-items: center; min-height: 96vh;">
+            <div style="outline: 2px solid black; padding: 2px; width: 80px; height: 94vh; display: flex; flex-direction: column;">
                 <div id="botTimer" class="timer"></div>
+                <div style="flex-grow: 1;"></div>
                 <div id="playerTimer" class="timer"></div>
             </div>
-            <div id="chess-board" style="margin-left: 20px; margin-right: 20px;"></div>
-            <div style="outline: 2px solid black; padding: 2px; width: 60px; height: 94vh;">
+            <div style="margin-left: 20px; margin-right: 20px;">
+                <div id="loading" style="visibility: hidden; margin-top: -20px; margin-bottom: 5px; text-align: center; font-size: larger; font-weight: 600">Loading...</div>
+                <div id="chess-board"></div>
+            </div>
+            <div style="outline: 2px solid black; padding: 2px; width: 80px; height: 96vh;">
                 <button onclick="new_game()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: -3px;" src="../imgs/chess_pieces/0.png"></button>
                 <button onclick="switch_sides()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: 0px;" src="../imgs/swap.png"></button>
+                <br><br>
+                <button onclick="import_game()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 95%; margin-top: 0px;" src="../imgs/plus.png"></button>
+                <button onclick="open_chess_com()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/chesscom.png"></button>
+                <button onclick="open_lichess()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/lichess.png"></button>
             </div>
         </div>
     </body>
