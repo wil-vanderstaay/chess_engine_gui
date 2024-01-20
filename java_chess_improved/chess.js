@@ -112,13 +112,7 @@ function create_move(source, target, piece, promote = 0, capture = 0, double = 0
 function create_move_uci(uci, board) {
     let source = square_index(uci[0] + uci[1]);
     let target = square_index(uci[2] + uci[3]);
-    let piece = 0;
-    for (let i = 0; i < 12; i++) {
-        if (get_bit(board.bitboards[i], source)) {
-            piece = i;
-            break;
-        }
-    }
+    let piece = board.squares[source] - 1;
     let letters = " nbrq";
     let promote = 0;
     if (uci.length == 5) { promote = letters.indexOf(uci[4]) + 6 * board.turn; }
@@ -266,7 +260,10 @@ class Timer {
 
 // BOT ----------------------------------------------------------------------------------------------------------------------
 class Bot {
-    constructor() { }
+    constructor() {
+        this.best_move = 0;
+        this.ply = 0;
+    }
 
     evaluate(board) {
         let res = 0;
@@ -299,38 +296,46 @@ class Bot {
     }
 
     generate_ordered_moves(board) {
-        return board.generate_moves().map(move => [score_move(board, move), move]).sort((a, b) => b[0] - a[0]).map(item => item[1]);
+        return board.generate_moves().map(move => [this.score_move(board, move), move]).sort((a, b) => b[0] - a[0]).map(item => item[1]);
     }
 
     search(board, depth, alpha, beta) {
         if (depth == 0) { return this.evaluate(board); }
         let moves = this.generate_ordered_moves(board);
+        let legal_moves = false;
         for (let i = 0; i < moves.length; i++) {
             let move = moves[i];
 
             if (!board.do_move(move)) {
                 continue;
             }
+            legal_moves = true;
+
+            this.ply++;
             let score = -this.search(board, depth - 1, -beta, -alpha);
+            this.ply--;
             board.undo_move();
 
             if (score > alpha) {
+                if (this.ply == 0) { this.best_move = move; }
                 alpha = score;
                 if (score >= beta) { // oppenent response too strong, snip
                     return beta;
                 }
             }
         }
+        if (!legal_moves) { return -9999; }
         return alpha;
     }
 
     think(board) {
-        let moves = board.generate_moves();
-        let n = Math.floor(Math.random() * moves.length);
-        for (let i = 0; i < 200000000; i++) {
-            n = Math.floor(Math.random() * moves.length);
+        let res = this.search(board, 6, -10000, 10000);
+        if (!this.best_move) {
+            let moves = board.generate_moves();
+            let n = Math.floor(Math.random() * moves.length);
+            return moves[n];
         }
-        return moves[n];
+        return this.best_move;
     }
 }
 
@@ -1009,7 +1014,7 @@ class Board {
         let pawn_direction = [-8, 8][this.turn];
 
         let curr_occ = 12 + this.turn;
-        let opp_occ = 12 + (this.turn ^ 1);
+        let opp_occ = 13 - this.turn;
 
         while (bool_bitboard(piece_board)) {
             let source = pop_lsb_index(piece_board);
@@ -1137,24 +1142,23 @@ class Board {
     }
 
     do_move(move) {
-        if (!move) { return false; }
-
         let source = get_move_source(move);
         let target = get_move_target(move);
         let piece = get_move_piece(move);
 
         let curr_occ = 12 + this.turn;
-        let opp_occ = 13 - this.turn;
 
         // Remove captured piece and enpassant
         this.capturedPiece = 0;
         if (get_move_capture(move)) {
-            let capture_square = get_move_enpassant(move) ? [target + 8, target - 8][this.turn] : target;
-            this.capturedPiece = this.squares[capture_square];
-            pop_bit(this.bitboards[this.capturedPiece - 1], capture_square);
-            pop_bit(this.bitboards[opp_occ], capture_square);
+            let enpassant = get_move_enpassant(move) ? 1 : 0;
+            let capture_square = [target, [target + 8, target - 8][this.turn]][enpassant];
+            let capture_piece = [this.squares[target] - 1, 6 - piece][enpassant];
+            pop_bit(this.bitboards[capture_piece], capture_square);
+            pop_bit(this.bitboards[13 - this.turn], capture_square);
             pop_bit(this.bitboards[14], capture_square);
             this.squares[capture_square] = 0;
+            this.capturedPiece = capture_piece + 1;
         }
 
         // Move piece
@@ -1178,9 +1182,9 @@ class Board {
         }
         // Perform castle 
         else if (get_move_castle(move)) {
-            let kingside = (target == 62) || (target == 6);
-            let rook_source = (kingside) ? target + 1 : target - 2;
-            let rook_target = (kingside) ? target - 1 : target + 1;
+            let kingside = (target == 62) | (target == 6);
+            let rook_source = [target - 2, target + 1][kingside];
+            let rook_target = [target + 1, target - 1][kingside];
 
             pop_bit(this.bitboards[piece - 2], rook_source);
             pop_bit(this.bitboards[curr_occ], rook_source);
@@ -1223,11 +1227,9 @@ class Board {
         let opp_occ = 12 + this.turn;
 
         // Reset promotion
-        let promote_piece = this.squares[target];
-        if (promote_piece) {
-            pop_bit(this.bitboards[promote_piece - 1], target);
-            // dont need to set piece occ because pop below
-            this.squares[target] = piece + 1;
+        if (get_move_promote(move)) {
+            pop_bit(this.bitboards[this.squares[target] - 1], target);
+            piece -= piece % 6; // set piece as pawn
         }
 
         // Move piece
@@ -1245,18 +1247,18 @@ class Board {
         // Reset captured piece and enpassant
         if (get_move_capture(move)) {
             let enpassant = get_move_enpassant(move) ? 1 : 0;
-            let capture_square = [target, target + 8 - (this.turn << 4)][enpassant];
+            let capture_square = [target, [target - 8, target + 8][this.turn]][enpassant];
 
-            this.squares[target] = this.capturedPiece;
+            this.squares[capture_square] = this.capturedPiece;
             set_bit(this.bitboards[this.capturedPiece - 1], capture_square);
             set_bit(this.bitboards[opp_occ], capture_square);
             set_bit(this.bitboards[14], capture_square);
         }
         // Reset castle 
         else if (get_move_castle(move)) {
-            let kingside = (target == 62) || (target == 6);
-            let rook_source = (kingside) ? target + 1 : target - 2;
-            let rook_target = (kingside) ? target - 1 : target + 1;
+            let kingside = (target == 62) | (target == 6);
+            let rook_source = [target - 2, target + 1][kingside];
+            let rook_target = [target + 1, target - 1][kingside];
 
             pop_bit(this.bitboards[piece - 2], rook_target);
             pop_bit(this.bitboards[curr_occ], rook_target);
@@ -1269,13 +1271,13 @@ class Board {
         }
 
         this.turn ^= 1;
-        this.gameStates.pop()
+        this.gameStates.pop();
         this.load_game_state();
         return true;
     }
 
     print_board() {
-        let letters = "PNBRQKpnbrqk";
+        let letters = "-PNBRQKpnbrqk";
         let bitboardRes = "";
         let squaresRes = "";
         for (let i = 0; i < 8; i++) {
@@ -1286,16 +1288,13 @@ class Board {
                 if (get_bit(this.bitboards[14], k)) {
                     for (let p = 0; p < 12; p++) {
                         if (get_bit(this.bitboards[p], k)) {
-                            piece = letters[p];
+                            piece = letters[p + 1];
                             break;
                         }
                     }
                 }
                 bitboardRes += piece + " ";
-
-                piece = this.squares[k];
-                piece = piece ? letters[piece - 1] : "-";
-                squaresRes += piece + " ";
+                squaresRes += letters[this.squares[k]] + " ";
             }
             bitboardRes += "\n";
             squaresRes += "\n";
@@ -1317,7 +1316,8 @@ class Board {
         if (depth == 0) { return 1; }
         let res = 0;
         let moves = this.generate_moves();
-        for (let i = 0; i < moves.length; i++) {
+        let movesLength = moves.length;
+        for (let i = 0; i < movesLength; i++) {
             let move = moves[i];
 
             if (!this.do_move(move)) {
@@ -1331,6 +1331,27 @@ class Board {
             }
 
             this.undo_move();
+        }
+        return res;
+    }
+
+    time_perft() {
+        let fens = [
+            [undefined, 6],
+            ["r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ", 4],
+            ["8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - ", 6],
+            ["r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 5],
+            ["rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  ", 5],
+        ];
+        let res = 0;
+        let fensLength = fens.length;
+        for (let i = 0; i < fensLength; i++) {
+            let f = fens[i][0];
+            let d = fens[i][1] - 1;
+            game = new Game(true, f);
+            let s = performance.now();
+            this.perft(d, false);
+            res += performance.now() - s;
         }
         return res;
     }
@@ -1554,7 +1575,8 @@ class Game {
                     document.getElementById("s" + (i)).onclick = null;
                 }
                 // override legal moves onclick
-                for (let i = 0; i < legal_moves.length; i++) {
+                let legalMovesLength = legal_moves.length; 
+                for (let i = 0; i < legalMovesLength; i++) {
                     if (legal_moves[i][0] == pos) {
                         let new_pos = legal_moves[i][1];
                         document.getElementById("s" + (new_pos)).onclick = () => {
@@ -1601,9 +1623,9 @@ class Game {
             // Update pieces affected by last move
             indicies = [last_move_source, last_move_target];
             if (get_move_castle(last_move)) {
-                let kingside = (last_move_target == 62) || (last_move_target == 6);
-                let rook_source = (kingside) ? last_move_target + 1 : last_move_target - 2;
-                let rook_target = (kingside) ? last_move_target - 1 : last_move_target + 1;
+                let kingside = (last_move_target == 62) | (last_move_target == 6);
+                let rook_source = [last_move_target - 2, last_move_target + 1][kingside];
+                let rook_target = [last_move_target + 1, last_move_target - 1][kingside];
                 indicies.push(rook_source);
                 indicies.push(rook_target);
             }
@@ -1623,7 +1645,8 @@ class Game {
                 }
             }
         }
-        for (let index = 0; index < indicies.length; index++) {
+        let indiciesLength = indicies.length;
+        for (let index = 0; index < indiciesLength; index++) {
             let i = indicies[index];
             let piece_location = table.rows.item(i >> 3).cells.item(i & 7);
 
