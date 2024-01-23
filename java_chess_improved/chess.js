@@ -1157,6 +1157,7 @@ class Bot {
     }
 
     think() {
+        this.best_move = 0;
         this.nodes = 0;
         if (this.book.following) {
             let move = this.book.bookMove(this.board.moves);
@@ -1184,6 +1185,7 @@ class Bot {
                 window *= 2;
             }
         }
+        print_move(this.best_move);
         console.log(" ");
         return this.best_move;
     }
@@ -1203,6 +1205,7 @@ class Move_Helper {
     ];
     static DIR_OFFSETS = [-8, 1, 8, -1, -7, 9, 7, -9]; // [dir] (0 N, 1 E, 2 S, 3 W, 4 NE, 5 SE, 6 SW, 7 NW)
     static NUM_SQUARES_EDGE = this.squares_to_edge(); // [square][dir]
+    static DIR_RAY_MASK = this.direction_ray_mask(); // [square][dir]
     static PAWN_ATTACK = this.pawn_attack(); // [side][square]
     static KNIGHT_ATTACK = this.knight_attack(); // [square]
     static KING_ATTACK = this.king_attack(); // [square]
@@ -1424,6 +1427,22 @@ class Move_Helper {
         }
         return res;
     }
+    static direction_ray_mask() {
+        let res = new Array(64);
+        for (let i = 0; i < 64; i++) {
+            let dir = new Array(8);
+            for (let j = 0; j < 8; j++) {
+                let n = this.NUM_SQUARES_EDGE[i][j];
+                let d = [0, 0];
+                for (let k = 1; k <= n; k++) {
+                    set_bit(d, i + k * this.DIR_OFFSETS[j]);
+                }
+                dir[j] = d;
+            }
+            res[i] = dir;
+        }
+        return res;
+    }
     static pawn_attack() {
         let res = [new Array(64), new Array(64)];
         for (let i = 0; i < 64; i++) { // player
@@ -1536,11 +1555,11 @@ class Move_Helper {
         return this.multupper_bitboards(occupancy, magic) >>> (32 - bits);
     }
     static get_bishop_attack(square, blocker) {
-        let magic_index = this.magic_index(and_bitboards(blocker, this.BISHOP_MASKS[square]), this.BISHOP_MAGICS[square]) >>> (32 - this.BISHOP_RELEVANT_BITS[square]);
+        let magic_index = this.magic_index(and_bitboards(blocker, this.BISHOP_MASKS[square]), this.BISHOP_MAGICS[square], this.BISHOP_RELEVANT_BITS[square]);
         return this.BISHOP_ATTACKS[square][magic_index];
     }
     static get_rook_attack(square, blocker) {
-        let magic_index = this.magic_index(and_bitboards(blocker, this.ROOK_MASKS[square]), this.ROOK_MAGICS[square]) >>> (32 - this.ROOK_RELEVANT_BITS[square]);
+        let magic_index = this.magic_index(and_bitboards(blocker, this.ROOK_MASKS[square]), this.ROOK_MAGICS[square], this.ROOK_RELEVANT_BITS[square]);
         return this.ROOK_ATTACKS[square][magic_index];
     }
     static get_queen_attack(square, blocker) {
@@ -1749,8 +1768,10 @@ class Board {
             this.gameStates
         */
 
+        //#region MAIN
         // BITBOARDS
         this.squares = new Array(64).fill(0);
+        this.kingSquares = [0, 0];
         let split_fen = fen.split(" ");
         let row = 0, col = 0;
         let pieces = "PNBRQKpnbrqk";
@@ -1764,7 +1785,12 @@ class Board {
         for (let i = 0; i < 15; i++) { this.bitboards[i] = [0, 0]; }
         for (let i = 0; i < 64; i++) { // pieces
             let piece = this.squares[i];
-            if (piece) { set_bit(this.bitboards[piece - 1], i); }
+            if (piece) {
+                set_bit(this.bitboards[piece - 1], i);
+                if (!(piece % 6)) {
+                    this.kingSquares[(piece / 6) - 1] = i;
+                }
+            }
         }
         for (let i = 0; i < 6; i++) { // white, black
             this.bitboards[12] = or_bitboards(this.bitboards[12], this.bitboards[i]);
@@ -1795,6 +1821,14 @@ class Board {
         this.capturedPiece = 0;
         this.moves = [0];
         this.gameStates = [new Game_State(this.capturedPiece, this.enpassant, this.castle, this.fifty)];
+        //#endregion
+
+        // Used for generate moves
+        this.inCheck = false;
+        this.doubleCheck = false;
+        this.checkRayBitboard = [0, 0];
+        this.pinRayBitboard = [0, 0];
+        this.slidingAttackBitboard = [0, 0];
     }
 
     get_game_state() {
@@ -1857,6 +1891,7 @@ class Board {
     }
 
     generate_moves() {
+        // return this.generate_moves_new();
         let moves = [];
         // Pawn moves
         let piece = 6 * this.turn;
@@ -1980,6 +2015,130 @@ class Board {
         return moves;
     }
 
+    generate_moves_new() {
+        this.calculate_attack_data();
+        let moves = this.generate_king_moves();
+        if (!this.doubleCheck) {
+            moves.push(...this.generate_sliding_moves());
+            moves.push(...this.generate_knight_moves());
+            moves.push(...this.generate_pawn_moves());
+        }
+        return moves;
+    }
+
+    calculate_attack_data() {
+        this.inCheck = false;
+        this.doubleCheck = false;
+        this.checkRayBitboard = [0, 0];
+        this.pinRayBitboard = [0, 0];
+
+        let enemyPawn = 6 * (this.turn ^ 1);
+
+        //#region Generate sliding attack map
+        let orthSliders = or_bitboards(this.bitboards[enemyPawn + 3], this.bitboards[enemyPawn + 4]);
+        let diagSliders = or_bitboards(this.bitboards[enemyPawn + 2], this.bitboards[enemyPawn + 4]);
+
+        let startDirIndex = !bool_bitboard(orthSliders) << 2; // 0 or 4
+        let endDirIndex = 4 << !!bool_bitboard(diagSliders); // 8 or 4
+        let copyOrth = copy_bitboard(orthSliders);
+        let copyDiag = copy_bitboard(diagSliders);
+
+        let kingBitboard = [0, 0];
+        let kingSquare = this.kingSquares[this.turn]
+        set_bit(kingBitboard, kingSquare);
+        let blockers = nand_bitboards(this.bitboards[14], kingBitboard);
+        while (bool_bitboard(orthSliders)) {
+            let orthSquare = pop_lsb_index(orthSliders);
+            this.slidingAttackBitboard = or_bitboards(this.slidingAttackBitboard, Move_Helper.get_rook_attack(orthSquare, blockers));
+        }
+        while (bool_bitboard(diagSliders)) {
+            let diagSquare = pop_lsb_index(diagSliders);
+            this.slidingAttackBitboard = or_bitboards(this.slidingAttackBitboard, Move_Helper.get_bishop_attack(diagSquare, blockers));
+        }
+        //#endregion
+
+        //#region Generate check & pin ray bitboards
+        for (let dir = startDirIndex; dir < endDirIndex; dir++) {
+            let sliders = [copyOrth, copyDiag][+(dir < 4)];
+            if (!bool_bitboard(and_bitboards(Move_Helper.DIR_RAY_MASK[kingSquare, dir], sliders))) { continue; }
+
+            let n = Move_Helper.NUM_SQUARES_EDGE[kingSquare, dir];
+            let offset = Move_Helper.DIR_OFFSETS[dir];
+            let friendlyPiece = false;
+            let rayMask = [0, 0];
+            for (let i = 1; i <= n; i++) {
+                let square = kingSquare + offset * i;
+                set_bit(rayMask, square);
+                let piece = this.squares[square];
+                if (piece) {
+                    if (piece < 6 == this.turn) { // enemy piece
+                        if (piece % 6 == 4 || (dir < 4 && piece % 6 == 3) || (dir > 3 && piece % 6 == 2)) { // piece can move in current direction
+                            if (friendlyPiece) { // pin
+                                this.pinRayBitboard = or_bitboards(this.pinRayBitboard, rayMask);
+                            } else {
+                                this.checkRayBitboard = or_bitboards(this.checkRayBitboard, rayMask);
+                                this.doubleCheck = this.inCheck;
+                                this.inCheck = true;
+                            }
+                        } else { // piece is blocking checks & pins
+                            break;
+                        }
+                    } else { // friendly piece
+                        if (!friendlyPiece) {
+                            friendlyPiece = true;
+                        } else { // second friendly piece, no pin possible
+                            break;
+                        }
+                    }
+                }
+            }
+            if (this.doubleCheck) { break; }
+        }
+        //#endregion
+
+        //#region Knight checks
+        let knightAttacks = [0, 0];
+        let knights = copy_bitboard(this.bitboards[6 * this.turn + 1]);
+        while (bool_bitboard(knights)) {
+            let square = pop_lsb_index(knights);
+            let att = Move_Helper.KNIGHT_ATTACK[square];
+            knightAttacks = or_bitboards(knightAttacks, att);
+            if (bool_bitboard(and_bitboards(kingBitboard, att))) {
+                set_bit(this.checkRayBitboard, square);
+                this.doubleCheck = this.inCheck;
+                this.inCheck = true;
+            }
+        }
+        //#endregion
+
+        //#region Pawn checks
+        let att = Move_Helper.PAWN_ATTACK[this.turn ^ 1][kingSquare];
+        if (bool_bitboard(and_bitboards(kingBitboard, att))) {
+            this.checkRayBitboard = or_bitboards(this.checkRayBitboard, and_bitboards(this.bitboards[6 * this.turn], att));
+            this.doubleCheck = this.inCheck;
+            this.inCheck = true;
+        }
+        //#endregion
+
+        if (!this.inCheck) { this.checkRayBitboard = [-1, -1]; } // bitboard full of 1s
+    }
+
+    generate_king_moves() {
+        return [];
+    }
+
+    generate_sliding_moves() {
+        return [];
+    }
+
+    generate_knight_moves() {
+        return [];
+    }
+
+    generate_pawn_moves() {
+        return [];
+    }
+
     get_legal_move(source, target) {
         let moves = this.generate_moves();
         for (let i = 0; i < 64; i++) {
@@ -1997,6 +2156,8 @@ class Board {
         let piece = get_move_piece(move);
 
         let curr_occ = 12 + this.turn;
+
+        if (piece % 6 == 5) { this.kingSquares[this.turn] = target; }
 
         // Remove captured piece and enpassant
         this.capturedPiece = 0;
@@ -2075,6 +2236,8 @@ class Board {
 
         let curr_occ = 13 - this.turn;
         let opp_occ = 12 + this.turn;
+
+        if (piece % 6 == 5) { this.kingSquares[this.turn ^ 1] = source; }
 
         // Reset promotion
         if (get_move_promote(move)) {
@@ -2435,8 +2598,7 @@ class Game {
                     document.getElementById("s" + (i)).onclick = null;
                 }
                 // override legal moves onclick
-                let legalMovesLength = legal_moves.length;
-                for (let i = 0; i < legalMovesLength; i++) {
+                for (let i = 0; i < legal_moves.length; i++) {
                     if (legal_moves[i][0] == pos) {
                         let new_pos = legal_moves[i][1];
                         console.log("set click move " + pos + " to " + new_pos);
