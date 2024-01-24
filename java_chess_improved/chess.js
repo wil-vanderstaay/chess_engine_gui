@@ -19,8 +19,11 @@ function or_bitboards(bitboard1, bitboard2) {
 function xor_bitboards(bitboard1, bitboard2) {
     return [bitboard1[0] ^ bitboard2[0], bitboard1[1] ^ bitboard2[1]];
 }
-function nand_bitboards(bitboard1, bitboard2) {
+function nand_bitboards(bitboard1, bitboard2) { // and not
     return [bitboard1[0] & ~bitboard2[0], bitboard1[1] & ~bitboard2[1]];
+}
+function nor_bitboards(bitboard1, bitboard2) { // not or
+    return [~(bitboard1[0] | bitboard2[0]), ~(bitboard1[1] | bitboard2[1])];
 }
 
 function get_bit(bitboard, i) {
@@ -1193,6 +1196,8 @@ class Bot {
 
 // MOVE HELPER
 class Move_Helper {
+    static KINGSIDE_MASK = [[0, 1610612736], [96, 0]];
+    static QUEENSIDE_MASK = [[0, 234881024], [14, 0]];
     static CASTLING_RIGHTS = [
         7, 15, 15, 15, 3, 15, 15, 11,
         15, 15, 15, 15, 15, 15, 15, 15,
@@ -1821,14 +1826,8 @@ class Board {
         this.capturedPiece = 0;
         this.moves = [0];
         this.gameStates = [new Game_State(this.capturedPiece, this.enpassant, this.castle, this.fifty)];
-        //#endregion
-
-        // Used for generate moves
         this.inCheck = false;
-        this.doubleCheck = false;
-        this.checkRayBitboard = [0, 0];
-        this.pinRayBitboard = [0, 0];
-        this.slidingAttackBitboard = [0, 0];
+        //#endregion
     }
 
     get_game_state() {
@@ -1891,7 +1890,6 @@ class Board {
     }
 
     generate_moves() {
-        // return this.generate_moves_new();
         let moves = [];
         // Pawn moves
         let piece = 6 * this.turn;
@@ -2016,22 +2014,15 @@ class Board {
     }
 
     generate_moves_new() {
-        this.calculate_attack_data();
-        let moves = this.generate_king_moves();
-        if (!this.doubleCheck) {
-            moves.push(...this.generate_sliding_moves());
-            moves.push(...this.generate_knight_moves());
-            moves.push(...this.generate_pawn_moves());
-        }
-        return moves;
-    }
-
-    calculate_attack_data() {
+        //#region Calculate attack data
+        // Prepare flags
         this.inCheck = false;
-        this.doubleCheck = false;
-        this.checkRayBitboard = [0, 0];
-        this.pinRayBitboard = [0, 0];
+        let doubleCheck = false;
+        let checkRayBitboard = [0, 0];
+        let pinRayBitboard = [0, 0];
+        let enemyOrEmptyBitboard = nand_bitboards([-1, -1], this.bitboards[12 + this.turn]);
 
+        let friendlyPawn = 6 * this.turn;
         let enemyPawn = 6 * (this.turn ^ 1);
 
         //#region Generate sliding attack map
@@ -2044,25 +2035,27 @@ class Board {
         let copyDiag = copy_bitboard(diagSliders);
 
         let kingBitboard = [0, 0];
-        let kingSquare = this.kingSquares[this.turn]
+        let kingSquare = this.kingSquares[this.turn];
         set_bit(kingBitboard, kingSquare);
+
+        let slidingAttacks = [0, 0];
         let blockers = nand_bitboards(this.bitboards[14], kingBitboard);
         while (bool_bitboard(orthSliders)) {
             let orthSquare = pop_lsb_index(orthSliders);
-            this.slidingAttackBitboard = or_bitboards(this.slidingAttackBitboard, Move_Helper.get_rook_attack(orthSquare, blockers));
+            slidingAttacks = or_bitboards(slidingAttacks, Move_Helper.get_rook_attack(orthSquare, blockers));
         }
         while (bool_bitboard(diagSliders)) {
             let diagSquare = pop_lsb_index(diagSliders);
-            this.slidingAttackBitboard = or_bitboards(this.slidingAttackBitboard, Move_Helper.get_bishop_attack(diagSquare, blockers));
+            slidingAttacks = or_bitboards(slidingAttacks, Move_Helper.get_bishop_attack(diagSquare, blockers));
         }
         //#endregion
 
         //#region Generate check & pin ray bitboards
         for (let dir = startDirIndex; dir < endDirIndex; dir++) {
-            let sliders = [copyOrth, copyDiag][+(dir < 4)];
-            if (!bool_bitboard(and_bitboards(Move_Helper.DIR_RAY_MASK[kingSquare, dir], sliders))) { continue; }
+            let sliders = [copyDiag, copyOrth][+(dir < 4)];
+            if (!bool_bitboard(and_bitboards(Move_Helper.DIR_RAY_MASK[kingSquare][dir], sliders))) { continue; }
 
-            let n = Move_Helper.NUM_SQUARES_EDGE[kingSquare, dir];
+            let n = Move_Helper.NUM_SQUARES_EDGE[kingSquare][dir];
             let offset = Move_Helper.DIR_OFFSETS[dir];
             let friendlyPiece = false;
             let rayMask = [0, 0];
@@ -2071,72 +2064,130 @@ class Board {
                 set_bit(rayMask, square);
                 let piece = this.squares[square];
                 if (piece) {
+                    piece--;
                     if (piece < 6 == this.turn) { // enemy piece
                         if (piece % 6 == 4 || (dir < 4 && piece % 6 == 3) || (dir > 3 && piece % 6 == 2)) { // piece can move in current direction
                             if (friendlyPiece) { // pin
-                                this.pinRayBitboard = or_bitboards(this.pinRayBitboard, rayMask);
-                            } else {
-                                this.checkRayBitboard = or_bitboards(this.checkRayBitboard, rayMask);
-                                this.doubleCheck = this.inCheck;
+                                pinRayBitboard = or_bitboards(pinRayBitboard, rayMask);
+                            } else { // check
+                                checkRayBitboard = or_bitboards(checkRayBitboard, rayMask);
+                                doubleCheck = this.inCheck;
                                 this.inCheck = true;
                             }
-                        } else { // piece is blocking checks & pins
-                            break;
                         }
-                    } else { // friendly piece
-                        if (!friendlyPiece) {
-                            friendlyPiece = true;
-                        } else { // second friendly piece, no pin possible
-                            break;
-                        }
+                    } else if (!friendlyPiece) { // first friendly piece
+                        friendlyPiece = true;
+                        continue;
                     }
+                    break;
                 }
             }
-            if (this.doubleCheck) { break; }
+            if (doubleCheck) { break; }
         }
         //#endregion
 
         //#region Knight checks
         let knightAttacks = [0, 0];
-        let knights = copy_bitboard(this.bitboards[6 * this.turn + 1]);
+        let knights = copy_bitboard(this.bitboards[enemyPawn + 1]);
         while (bool_bitboard(knights)) {
             let square = pop_lsb_index(knights);
             let att = Move_Helper.KNIGHT_ATTACK[square];
             knightAttacks = or_bitboards(knightAttacks, att);
             if (bool_bitboard(and_bitboards(kingBitboard, att))) {
-                set_bit(this.checkRayBitboard, square);
-                this.doubleCheck = this.inCheck;
+                set_bit(checkRayBitboard, square);
+                doubleCheck = this.inCheck;
                 this.inCheck = true;
             }
         }
         //#endregion
 
         //#region Pawn checks
-        let att = Move_Helper.PAWN_ATTACK[this.turn ^ 1][kingSquare];
-        if (bool_bitboard(and_bitboards(kingBitboard, att))) {
-            this.checkRayBitboard = or_bitboards(this.checkRayBitboard, and_bitboards(this.bitboards[6 * this.turn], att));
-            this.doubleCheck = this.inCheck;
-            this.inCheck = true;
+        let pawnAttacks = [0, 0];
+        let pawns = copy_bitboard(this.bitboards[enemyPawn]);
+        while (bool_bitboard(pawns)) {
+            let square = pop_lsb_index(pawns);
+            let att = Move_Helper.PAWN_ATTACK[this.turn ^ 1][square];
+            pawnAttacks = or_bitboards(pawnAttacks, att);
+            if (bool_bitboard(and_bitboards(kingBitboard, att))) {
+                set_bit(checkRayBitboard, square);
+                doubleCheck = this.inCheck;
+                this.inCheck = true;
+            }
         }
         //#endregion
 
-        if (!this.inCheck) { this.checkRayBitboard = [-1, -1]; } // bitboard full of 1s
-    }
+        let opponentAttackBitboard = or_bitboards(slidingAttacks, or_bitboards(knightAttacks, pawnAttacks));
+        if (!this.inCheck) { checkRayBitboard = [-1, -1]; } // bitboard full of 1s
+        //#endregion
 
-    generate_king_moves() {
-        return [];
-    }
+        print_bitboard(checkRayBitboard);
+        print_bitboard(pinRayBitboard);
+        print_bitboard(opponentAttackBitboard);
 
-    generate_sliding_moves() {
-        return [];
-    }
+        let moves = [];
 
-    generate_knight_moves() {
-        return [];
-    }
-
-    generate_pawn_moves() {
-        return [];
+        //#region King moves
+        let legalMask = nor_bitboards(opponentAttackBitboard, this.bitboards[12 + this.turn]);
+        let kingMoves = and_bitboards(Move_Helper.KING_ATTACK[kingSquare], legalMask);
+        while (bool_bitboard(kingMoves)) {
+            let square = pop_lsb_index(kingMoves);
+            moves.push(create_move(kingSquare, square, friendlyPawn + 5, 0, get_bit(this.bitboards[14], square)));
+        }
+        if ((this.castle & (9 * this.turn + 3)) && !this.inCheck) {
+            let blockers = or_bitboards(opponentAttackBitboard, this.bitboards[14]);
+            let kingside = [this.castle & 1, this.castle & 4][this.turn];
+            let kingsideMask = Move_Helper.KINGSIDE_MASK[this.turn];
+            let queenside = [this.castle & 2, this.castle & 8][this.turn];
+            let queensideMask = Move_Helper.QUEENSIDE_MASK[this.turn];
+            if (kingside && !bool_bitboard(and_bitboards(kingsideMask, blockers))) {
+                moves.push(create_move(kingSquare, kingSquare + 2, friendlyPawn + 5, 0, 0, 0, 0, 1));
+            }
+            if (queenside && !bool_bitboard(and_bitboards(queensideMask, blockers))) {
+                moves.push(create_move(kingSquare, kingSquare - 2, friendlyPawn + 5, 0, 0, 0, 0, 1));
+            }
+        }
+        //#endregion
+        
+        if (!doubleCheck) {
+            //#region Sliding moves
+            let moveMask = and_bitboards(enemyOrEmptyBitboard, checkRayBitboard);
+            if (this.inCheck) { // pinned pieces cannot move if king in check
+                copyOrth = nand_bitboards(copyOrth, pinRayBitboard);
+                copyDiag = nand_bitboards(copyDiag, pinRayBitboard);
+            }
+            while (bool_bitboard(copyOrth)) {
+                let source = pop_lsb_index(copyOrth);
+                let piece = this.squares[source];
+                let att = and_bitboards(Move_Helper.get_rook_attack(source, this.bitboards[14]), moveMask);
+                if (get_bit(pinRayBitboard, source)) { // is pinned
+                    // TODO att = and_bitboards(att, att); // align attacks along pin ray
+                }
+                while (bool_bitboard(att)) {
+                    let target = pop_lsb_index(att);
+                    moves.push(create_move(source, target, piece - 1, 0, get_bit(this.bitboards[14], target)));
+                }
+            }
+            while (bool_bitboard(copyDiag)) {
+                let source = pop_lsb_index(copyDiag);
+                let piece = this.squares[source];
+                let att = and_bitboards(Move_Helper.get_bishop_attack(source, this.bitboards[14]), moveMask);
+                if (get_bit(pinRayBitboard, source)) { // is pinned
+                    // TODO att = and_bitboards(att, att); // align attacks along pin ray
+                }
+                while (bool_bitboard(att)) {
+                    let target = pop_lsb_index(att);
+                    moves.push(create_move(source, target, piece - 1, 0, get_bit(this.bitboards[14], target)));
+                }
+            }
+            //#endregion
+            
+            //#region Knight moves
+            //#endregion
+            
+            //#region Pawn moves
+            //#endregion
+        }
+        return moves;
     }
 
     get_legal_move(source, target) {
