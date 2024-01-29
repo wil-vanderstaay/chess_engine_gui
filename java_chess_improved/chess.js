@@ -1054,6 +1054,7 @@ class Bot {
         this.board = board;
         this.timer = timer;
         this.book = new Book();
+        this.book.following = board.fen == Game.START_FEN;
 
         this.ply = 0;
 
@@ -1075,6 +1076,7 @@ class Bot {
         let res = 0;
         let target = get_move_target(move);
         let piece = get_move_piece(move) % 6;
+        res += 6 - piece;
 
         let att_piece = this.board.is_square_attacked(target, this.board.turn ^ 1);
         if (att_piece) {
@@ -1112,13 +1114,9 @@ class Bot {
         }
         if (depth == 0) { return score; }
         let moves = this.generate_capture_moves();
-        let legal_moves = false;
         for (let i = 0; i < moves.length; i++) {
             let move = moves[i];
-            if (!this.board.do_move(move)) {
-                continue;
-            }
-            legal_moves = true;
+            this.board.do_move(move);
 
             this.ply++;
             let score = -this.search_captures(depth - 1, -beta, -alpha);
@@ -1140,15 +1138,10 @@ class Bot {
 
         if (depth == 0) { return this.search_captures(8, alpha, beta); }
         let moves = this.generate_ordered_moves();
-        let legal_moves = false;
+        if (!moves.length) { return -9999 + this.ply; }
         for (let i = 0; i < moves.length; i++) {
             let move = moves[i];
-            if (get_move_enpassant(move)) { if (this.ply == 0) { this.best_move = move; } return 50000; }
-
-            if (!this.board.do_move(move)) {
-                continue;
-            }
-            legal_moves = true;
+            this.board.do_move(move)
 
             this.ply++;
             let score = -this.search(allocatedTime, depth - 1, -beta, -alpha);
@@ -1165,7 +1158,6 @@ class Bot {
 
             if (depth > 2 && this.timer.elapsed_this_turn() > allocatedTime) { return alpha; }
         }
-        if (!legal_moves) { return -9999 + this.ply; }
         return alpha;
     }
 
@@ -2040,7 +2032,7 @@ class Board {
         }
         //#endregion
 
-        let opponentAttackBitboard = or_bitboards(slidingAttacks, or_bitboards(knightAttacks, pawnAttacks));
+        let opponentAttackBitboard = or_bitboards(Move_Helper.KING_ATTACK[this.kingSquares[this.turn ^ 1]], or_bitboards(slidingAttacks, or_bitboards(knightAttacks, pawnAttacks)));
         if (!inCheck) { checkRayBitboard = [4294967295, 4294967295]; }
         //#endregion
 
@@ -2383,7 +2375,6 @@ class Board {
         let movesLength = moves.length;
         for (let i = 0; i < movesLength; i++) {
             let move = moves[i];
-
             this.do_move(move);
 
             let start_res = res;
@@ -2407,6 +2398,7 @@ class Board {
             ["r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 4], // 46, 2079, 89890, 3894594, 164075551
         ];
         let res = [0, 0]; 
+        let tot_nodes = [0, 0];
         let fensLength = fens.length;
         console.log("current / new");
         for (let i = 0; i < fensLength; i++) {
@@ -2421,11 +2413,15 @@ class Board {
             let e = performance.now();
 
             res[0] += m - s;
-            // res[1] += e - m;
+            res[1] += e - m;
+
+            tot_nodes[0] += x1;
+            tot_nodes[1] += x2;
 
             console.log(x1, x2);
         }
-        return res;
+        console.log(res);
+        console.log(tot_nodes);
     }
 }
 
@@ -2769,5 +2765,6 @@ function open_chess_com() { open("https://www.chess.com/analysis?pgn=" + game.ge
 function open_lichess() { open("https://www.lichess.org/paste?pgn=" + game.get_pgn()); }
 //#endregion
 
-let game = new Game(true);
+// let game = new Game(true);
+let game = new Game(true, "1R6/8/8/8/8/4k3/3p1n2/3K4 w - - 2 58");
 window.onresize = () => { game.display(true); };
