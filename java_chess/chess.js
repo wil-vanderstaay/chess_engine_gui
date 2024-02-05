@@ -2199,6 +2199,7 @@ function best_eval_captures(depth, alpha, beta) {
 }
 
 function best_eval(depth, alpha, beta) {
+    COUNT++;
     pv_length[ply] = ply;
     if (ply && is_repetition()) { return 0; }
 
@@ -2216,7 +2217,6 @@ function best_eval(depth, alpha, beta) {
     if (follow_pv) { enable_pv_scoring(moves); }
     moves = order_moves(moves, best_move);
 
-    COUNT++;
     let hash_flag = 2;
     let legal_moves = false;
     for (let i = 0; i < moves.length; i++) {
@@ -2310,6 +2310,7 @@ function search(search_time=750, override_depth=0) {
     }
     let time = Math.round(performance.now() - start);
     console.log("Best move: %s\tEval: %d\tTime (ms): %d\tHash size: %d", get_move_san(pv_table[0][0], false), eval, time, Object.keys(HASH_TABLE.hashes).length);
+    console.log("NPS: " + Math.round(COUNT / (time / 1000)));
     console.log(" ");
     return eval;
 }
