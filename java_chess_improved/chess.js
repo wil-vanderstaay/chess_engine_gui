@@ -965,7 +965,7 @@ class Book {
             }
             this.moveLists.push(pgnMoves);
         }
-        this.maxBookLength = moveLists.reduce((acc, item) => Math.max(acc, item.length), 0);
+        this.maxBookLength = this.moveLists.reduce((acc, item) => Math.max(acc, item.length), 0);
     }
 
     cullBook() {
@@ -1031,7 +1031,8 @@ class Book {
         let moves = [];
         for (let i = 0; i < this.moveLists.length; i++) {
             let bookMoves = this.moveLists[i];
-            for (let j = 0; j < bookMoves.length; j++) {
+            let numMoves = Math.min(bookMoves.length, 16);
+            for (let j = 0; j < numMoves; j++) {
                 if (j == gameMoves.length) {
                     moves.push(bookMoves[j]);
                     break;
@@ -1076,7 +1077,6 @@ class Hash_Table {
     }
 
     get(hash_key, depth, alpha, beta) {
-        // return null;
         let key = this.key(hash_key);
         let entry = this.hashes[key];
         if (entry != null && entry.hash_0 == hash_key[0] && entry.hash_1 == hash_key[1]) {
@@ -1246,6 +1246,7 @@ class Bot {
 
     static MAX_PLY = 32;
     static MATE_SCORE = 10000;
+    static MATE_SCORE_BOUND = 9950;
 
     constructor(board, timer, useBook = true) {
         this.board = board;
@@ -1253,7 +1254,6 @@ class Bot {
 
         this.book = new Book();
         this.book.following = useBook;
-        this.book.following = false;
         this.hashTable = new Hash_Table();
 
         this.ply = 0;
@@ -1307,9 +1307,8 @@ class Bot {
         let res = 0;
         if (capture) {
             let capturePiece = this.board.squares[target] - 1;
-            let captureValue = Bot.PIECE_VALUES[piece] - Bot.PIECE_VALUES[capturePiece % 6];
-            // TODO : if opponent can recapture do below. else just +800
-            res += [20000, 80000][+(captureValue > 0)] + captureValue;
+            let captureValue = Bot.PIECE_VALUES[capturePiece % 6] - Bot.PIECE_VALUES[piece];
+            res += [20000, 80000][+(captureValue >= 0) || !get_bit(this.board.opponentAttackBitboard, target)] + captureValue;
         }
 
         if (!piece) {
@@ -1318,7 +1317,9 @@ class Bot {
             }
         } else if (piece != 5) {
             res += Bot.PIECE_POSITION_VALUES[piece][target] - Bot.PIECE_POSITION_VALUES[piece][source];
-            // TODO : if opponent can capture with pawn -50, if with other piece -25
+            if (get_bit(this.board.opponentAttackBitboard, target)) {
+                res -= [250, 500][get_bit(this.board.pawnAttacks, target)];
+            }
         }
 
         if (!capture) {
@@ -1473,6 +1474,7 @@ class Bot {
                 res = this.search(allocatedTime, depth, alpha, beta);
                 console.log("######## Depth: " + depth + " \t Eval: " + res + " \tNodes: " + this.nodes + " \tLookup: " + this.lookup + " ########");
 
+                if (Math.abs(res) >= Bot.MATE_SCORE_BOUND) { break; }
                 if (this.timer.elapsed_this_turn() > allocatedTime) { break; }
                 if (alpha < res && res < beta) { break; }
                 window *= 2;
@@ -2885,11 +2887,10 @@ class Game {
         let evaluation = this.bot.think();
         let move = this.bot.pvTable[0][0];
 
-        let nullMove = !move;
-        if (nullMove) {
-            console.log("THINK WE CHECK MATED THE BOT?? HOPEFULLY NO OTHER SCENARIOS...");
-            let kingPos = this.board.kingSquares[this.board.turn];
-            move = create_move(kingPos, kingPos, 12, 0, 1); // turn enemy king into resignation flag
+        if (!move) { // player checkmated bot
+            this.botTimer.stop();
+            this.display(true);
+            return;
         }
 
         let san = get_move_san(move, this.board);
@@ -2897,10 +2898,11 @@ class Game {
         this.board.do_move(move);
         this.display();
 
-        if (nullMove) { // prevent player from moving
-            this.board.turn = this.board.turn ^ 1;
+        if (evaluation == Bot.MATE_SCORE - 1) { // bot checkmated player
+            this.board.turn ^= 1;
             this.display(true);
         }
+
         this.botTimer.stop();
         this.playerTimer.start();
     }
@@ -3079,17 +3081,15 @@ class Game {
         }
         let indiciesLength = indicies.length;
         for (let index = 0; index < indiciesLength; index++) {
-            let i = this.playerWhite ? indicies[index] : 63 - indicies[index];
+            let val = indicies[index];
+            let i = [63 - val, val][+this.playerWhite];
             let piece_location = table.rows.item(i >> 3).cells.item(i & 7);
 
-            let children = piece_location.childNodes.length;
-            if (children > 0 && (piece_location.childNodes[0].className != "label" || children == 2)) {
-                piece_location.removeChild(piece_location.childNodes[children - 1]);
-            }
+            let children = Array.from(piece_location.childNodes).filter((child) => child.className != "label");
+            children.map(child => piece_location.removeChild(child));
             piece_location.style.background = "";
 
-            let b = [63 - i, i][+this.playerWhite];
-            let j = this.board.squares[b];
+            let j = this.board.squares[val];
             if (j) {
                 j--;
                 let piece = '<img draggable="false" style="width: ' + (width - 10) + 'px; height: ' + (width - 10) + 'px;" src="../imgs/chess_pieces/' + (j) + '.png">';
