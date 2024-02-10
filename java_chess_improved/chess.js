@@ -1418,15 +1418,6 @@ class Book {
                     }
                 }
             }
-
-            // for (let b = 0; b < bannedWhite.length; b++) {
-            //     if (!unique ||
-            //         things[i].startsWith(bannedWhite[b]) ||
-            //         (b < bannedBlack.length && things[i].slice(0, 15).includes(bannedBlack[b]))) {
-            //         unique = false;
-            //         break;
-            //     }
-            // }
             if (unique) {
                 res.push(things[i]);
             }
@@ -1469,7 +1460,7 @@ class Book {
         let moves = [];
         for (let i = 0; i < this.moveLists.length; i++) {
             let bookMoves = this.moveLists[i];
-            let numMoves = Math.min(bookMoves.length, 16);
+            let numMoves = Math.min(bookMoves.length, 20);
             for (let j = 0; j < numMoves; j++) {
                 if (j == gameMoves.length) {
                     moves.push(bookMoves[j]);
@@ -1503,7 +1494,8 @@ class TT_Entry {
 class Hash_Table {
     static HASH_SIZE = 64000000;
 
-    constructor() {
+    constructor(mateScoreBound) {
+        this.mateScoreBound = mateScoreBound;
         this.hashes = new Array(Hash_Table.HASH_SIZE);
         // this.hashes = {}; // TODO - which is best?
     }
@@ -1514,13 +1506,26 @@ class Hash_Table {
         return ((hash_key[0] % Hash_Table.HASH_SIZE) + (hash_key[1] % Hash_Table.HASH_SIZE)) % Hash_Table.HASH_SIZE;
     }
 
-    get(hash_key, depth, alpha, beta) {
+    getMove(hash_key) {
+        let key = this.key(hash_key);
+        let entry = this.hashes[key];
+        if (entry != null && entry.hash_0 == hash_key[0] && entry.hash_1 == hash_key[1]) {
+            return entry.move;
+        }
+        return 0;
+    }
+
+    get(hash_key, depth, ply, alpha, beta) {
         let key = this.key(hash_key);
         let entry = this.hashes[key];
         if (entry != null && entry.hash_0 == hash_key[0] && entry.hash_1 == hash_key[1]) {
             if (entry.depth >= depth) {
                 let flag = entry.flag;
+                // Fix mate score
                 let score = entry.score;
+                if (Math.abs(score) > this.mateScoreBound) {
+                    score += [-ply, ply][+(score < 0)];
+                }
                 if (flag == 0) { return score; }
                 else if (flag == 1 && score <= alpha) { return alpha; }
                 else if (flag == 2 && score >= beta) { return beta; }
@@ -1529,8 +1534,12 @@ class Hash_Table {
         return null;
     }
 
-    set(hash_key, depth, flag, score, move=0) {
+    set(hash_key, depth, ply, flag, score, move) {
         let key = this.key(hash_key);
+        // Fix mate score
+        if (Math.abs(score) > this.mateScoreBound) {
+            score += [ply, -ply][+(score < 0)];
+        }
         this.hashes[key] = new TT_Entry(hash_key, depth, flag, score, move);
     }
 }
@@ -1565,6 +1574,23 @@ class Repetition_Table {
 }
 
 // BOT ----------------------------------------------------------------------------------------------------------------------
+class Search_Results {
+    constructor(depth, evaluation, nodes, lookup, time, pvString) {
+        this.depth = depth;
+        this.evaluation = evaluation;
+        this.nodes = nodes;
+        this.lookup = lookup;
+        this.time = time;
+        this.pvString = pvString;
+    }
+
+    display(print = true) {
+        let displayStr = "######## Depth: " + this.depth + " \t Eval: " + this.evaluation + " \tNodes: " + this.nodes + " \tLookup: " + this.lookup + " \tTime (ms): " + this.time + "\nPV: " + this.pvString;
+        if (print) { console.log(displayStr); }
+        return displayStr;
+    }
+}
+
 class Bot {
     static PIECE_VALUES = [
         82, 337, 365, 477, 1025, 0, // opening material score
@@ -1689,33 +1715,37 @@ class Bot {
     constructor(board, timer, useBook = true) {
         this.board = board;
         this.timer = timer;
+        this.ply = 0;
 
         this.book = new Book();
         this.book.following = useBook;
-        this.hashTable = new Hash_Table();
+        this.hashTable = new Hash_Table(Bot.MATE_SCORE_BOUND);
 
-        this.ply = 0;
-        this.nodes = 0;
-        this.lookup = 0;
+        this.lastEvaluation = 0;
 
         this.repetitionTable = new Repetition_Table();
         this.pvLength; // [ply]
         this.pvTable; // [ply][ply]
         this.historyMoves; // [turn][piece][target]
-        this.killerMoves; // [killer index][ply]  
+        this.killerMoves = Array.from(Array(2), () => Array(Bot.MAX_PLY)); // [killer index][ply]  
+
+        this.searchResults; // stores the results from a single think() call
+        this.nodes;
+        this.lookup;
+        this.startTime;
+
         this.resetSearchTables();
     }
 
     resetSearchTables() {
+        this.repetitionTable.load(this.board);
+        this.pvLength = Array.from(Array(1), () => Array(Bot.MAX_PLY));
+        this.pvTable = Array.from(Array(Bot.MAX_PLY), () => Array(Bot.MAX_PLY).fill(0));
+        this.historyMoves = Array.from(Array(2), () => Array.from(Array(6), () => Array(64).fill(0))); // [turn][piece][target]
+        
+        this.searchResults = [];
         this.nodes = 0;
         this.lookup = 0;
-
-        this.repetitionTable.load(this.board);
-
-        this.pvLength = Array.from(Array(1), () => Array(Bot.MAX_PLY));
-        this.pvTable = Array.from(Array(Bot.MAX_PLY), () => Array(Bot.MAX_PLY));
-        this.historyMoves = Array.from(Array(2), () => Array.from(Array(6), () => Array(64).fill(0)));
-        this.killerMoves = Array.from(Array(2), () => Array(Bot.MAX_PLY));
     }
 
     evaluate() {
@@ -1822,16 +1852,16 @@ class Bot {
             return 0;
         }
 
-        let hashScore = this.hashTable.get(this.board.hashKey, depth, alpha, beta);
-        if (this.ply && hashScore != null) { // TODO - which is best? Need better way to store best move
-        // if (hashScore != null) { 
+        let hashScore = this.hashTable.get(this.board.hashKey, depth, this.ply, alpha, beta);
+        if (hashScore != null) {
             this.lookup++; 
+            if (!this.ply) {
+                this.pvTable[0][0] = this.hashTable.getMove(this.board.hashKey);
+            }
             return hashScore;
         }
         if (depth == 0 || this.ply >= Bot.MAX_PLY) {
-            let score = this.search_captures(8, alpha, beta);
-            this.hashTable.set(this.board.hashKey, depth, 0, score);
-            return score;
+            return this.search_captures(8, alpha, beta);
         }
 
         let moves = this.generate_ordered_moves();
@@ -1850,11 +1880,11 @@ class Bot {
             this.ply--;
             this.board.undo_move(true);
 
-            // if (this.timer.elapsed_this_turn() > allocatedTime) { return alpha; } // TODO this might still be buggy? Does this work?
+            // if (this.timer.elapsed_this_turn() > allocatedTime) { return alpha; } // TODO this might still be buggy? Does this work? Should this be below alpha beta checks?
             if (this.timer.elapsed_this_turn() > allocatedTime) { return 0; }
 
             if (score >= beta) { // oppenent response too strong, snip
-                this.hashTable.set(this.board.hashKey, depth, 2, beta);
+                this.hashTable.set(this.board.hashKey, depth, this.ply, 2, beta, move);
                 if (!get_move_capture(move)) {
                     this.killerMoves[1][this.ply] = this.killerMoves[0][this.ply];
                     this.killerMoves[0][this.ply] = move;
@@ -1877,42 +1907,61 @@ class Bot {
                     this.pvTable[this.ply][i] = this.pvTable[this.ply + 1][i];
                 }
                 this.pvLength[this.ply] = this.pvLength[this.ply + 1];
-                if (this.ply == 0) {
-                    console.log((score).toString().padStart(4, " ") + " - " + Array.from(Array(this.pvLength[0]), (item, index) => get_move_uci(this.pvTable[0][index])).join(", "));
-                }
             }
         }
-        this.hashTable.set(this.board.hashKey, depth, hashFlag, alpha);
+        this.hashTable.set(this.board.hashKey, depth, this.ply, hashFlag, alpha, this.pvTable[this.ply][this.ply]);
         if (this.ply) {
             this.repetitionTable.pop();
         }
         return alpha;
     }
 
-    think() {
+    think(swapDisplayedEval = false) {
+        this.resetSearchTables();
         if (this.book.following) {
             let move = this.book.bookMove(this.board.moves);
             if (move) {
                 this.pvTable[0][0] = move;
-                console.log("BOOK - " + get_move_uci(move));
+                let results = new Search_Results(0, 0, 0, 0, 0, "Book");
+                this.searchResults.push(results);
+                results.display();
                 console.log(" ");
                 return 0;
             }
             this.book = { "following": false };
         }
 
-        this.resetSearchTables();
-        let res = 0;
+        if (!this.board.generate_moves().length) { return [0, -Bot.MATE_SCORE][+this.board.inCheck]; }
+
+        let res = this.lastEvaluation;
         let allocatedTime = Math.min(5000, this.timer.remaining() / 8);
         for (let depth = 1; this.timer.elapsed_this_turn() <= allocatedTime / 5; depth++) {
             for (let window = 40; ;) {
                 let alpha = res - window;
                 let beta = res + window;
 
+                let startNodes = this.nodes;
+                let startLookup = this.lookup;
+                let startTime = performance.now();
                 res = this.search(allocatedTime, depth, alpha, beta);
-                console.log("######## Depth: " + depth + " \t Eval: " + res + " \tNodes: " + this.nodes + " \tLookup: " + this.lookup + " ########");
+                
+                // Store bot search results
+                let endTime = Math.round(performance.now() - startTime);
+                let endNodes = this.nodes - startNodes;
+                let endLookup = this.lookup - startLookup;
+                let pvString = Array.from(Array(this.pvLength[0]), (item, index) => get_move_uci(this.pvTable[0][index])).join(", ");
+                
+                let results = new Search_Results(depth, [res, -res][+swapDisplayedEval], endNodes, endLookup, endTime, pvString);
+                this.searchResults.push(results);
+                results.display();
 
-                if (Math.abs(res) >= Bot.MATE_SCORE_BOUND) { break; }
+                // Check if iteration complete
+                if (Math.abs(res) > Bot.MATE_SCORE_BOUND) {
+                    if (this.pvTable[0][0]) {
+                        allocatedTime = 0;
+                    }
+                    break;
+                }
                 if (this.timer.elapsed_this_turn() > allocatedTime) { break; }
                 if (alpha < res && res < beta) { break; }
                 window *= 2;
@@ -1921,6 +1970,7 @@ class Bot {
         let time = this.timer.elapsed_this_turn();
         console.log("Time (ms): " + time + " \tNPS: " + Math.round(this.nodes / time * 1000));
         console.log(" ");
+        this.lastEvaluation = res;
         return res;
     }
 }
@@ -3111,31 +3161,21 @@ class Board {
         this.hashKey = xor_bitboards(this.hashKey, Zobrist.ZOB_ENPASSANT[this.enpassant]);
     }
 
-    print_board() {
+    print_board(print = true, flip = false) {
         let letters = "-PNBRQKpnbrqk";
-        let bitboardRes = "";
-        let squaresRes = "";
+        let res = ["    a b c d e f g h\n\n", "    h g f e d c b a\n\n"][+flip];
         for (let i = 0; i < 8; i++) {
+            res += [8 - i, i + 1][+flip] + "   ";
             for (let j = 0; j < 8; j++) {
                 let k = (i << 3) + j;
-
-                let piece = "-";
-                if (get_bit(this.bitboards[14], k)) {
-                    for (let p = 0; p < 12; p++) {
-                        if (get_bit(this.bitboards[p], k)) {
-                            piece = letters[p + 1];
-                            break;
-                        }
-                    }
-                }
-                bitboardRes += piece + " ";
-                squaresRes += letters[this.squares[k]] + " ";
+                if (flip) { k = 63 - k; }
+                res += letters[this.squares[k]] + " ";
             }
-            bitboardRes += "\n";
-            squaresRes += "\n";
+            res += "\n";
         }
-        console.log(bitboardRes);
-        console.log(squaresRes);
+        if (print) { console.log(res); }
+        return res;
+
     }
 
     copy_bitboards() {
@@ -3158,10 +3198,7 @@ class Board {
 
             let start_res = res;
             res += this.perft_aux(depth - 1, false);
-            if (print) {
-                console.log(get_move_uci(move) + "\t->\t" + (res - start_res));
-            }
-
+            if (print) { console.log(get_move_uci(move) + "\t->\t" + (res - start_res)); }
             this.undo_move();
         }
         return res;
@@ -3228,6 +3265,7 @@ class Game {
         this.botTimer = new Timer("botTimer", timer, timerIncrement, true);
         let useBook = this.fen == Game.START_FEN;
         this.bot = new Bot(this.board, this.botTimer, useBook);
+        this.searchResults = [];
 
         this.make_table();
         this.display();
@@ -3239,14 +3277,15 @@ class Game {
         }
     }
 
-    get_pgn() {
-        let res = '[Event "?"][Site "?"][Date "????.??.??"][Round "?"][White "'
-        res += this.playerWhite ? 'WillyWonka"][Black "Computer' : 'Computer"][Black "WillyWonka';
-        res += '"][Result "*"]';
+    get_pgn(movesPerLine = 0) {
+        let res = '[Event "?"]\n[Site "?"]\n[Date "????.??.??"]\n[Round "?"]\n[White "'
+        res += this.playerWhite ? 'WillyWonka"]\n[Black "Computer' : 'Computer"]\n[Black "WillyWonka';
+        res += '"]\n[Result "*"]';
         if (this.fen != Game.START_FEN) { res += '[FEN "' + this.fen + '"]'; }
-
+        res += '\n\n';
         for (let i = 0; i < this.moves.length; i++) {
             if (i % 2 == 0) {
+                if ((i >> 1) % movesPerLine == 0) { res += "\n"; }
                 res += String(Math.floor(i / 2) + 1) + "." + " ";
             }
             res += this.moves[i] + " ";
@@ -3322,13 +3361,14 @@ class Game {
             clearInterval(Game.PLAYER_TIMER_INTERVALS.pop());
         }
 
-        let evaluation = this.bot.think();
+        let evaluation = this.bot.think(this.playerWhite);
+        this.searchResults.push(this.bot.searchResults);
         let move = this.bot.pvTable[0][0];
 
         if (!move) { // player checkmated bot
             this.botTimer.stop();
             this.display(true);
-            return;
+            return this.end_game();
         }
 
         let san = get_move_san(move, this.board);
@@ -3338,11 +3378,75 @@ class Game {
 
         if (evaluation == Bot.MATE_SCORE - 1) { // bot checkmated player
             this.board.turn ^= 1;
+            this.botTimer.stop();
             this.display(true);
+            return this.end_game();
         }
 
         this.botTimer.stop();
         this.playerTimer.start();
+    }
+
+    display_search_results(print = true) {
+        let b = new Board(this.fen);
+        let botStartIndex = +(b.turn == this.playerWhite);
+        let moves = this.board.moves;
+        
+        let res = "";
+        for (let i = 1; i < moves.length; i++) {
+            let move = moves[i];
+            let moveSan = this.moves[i - 1];
+            if (i % 2 == 1) { res += "\nMove #" + ((i >> 1) + 1); }
+            if (i % 2 == botStartIndex) {
+                res += "\n";
+                let result = this.searchResults[(i - 1) >> 1];
+                for (let j = 0; j < result.length; j++) {
+                    res += result[j].display(false, this.playerWhite) + "\n";
+                }
+                res += ["Bot book move - ", "\nBot move - "][+(result.length > 0)] + moveSan + "\n";
+            } else {
+                res += "\nHuman move - " + moveSan + "\n";
+            }
+
+            b.do_move(move);
+            res += "\n" + b.print_board(false, !this.playerWhite);
+        }
+        if (print) { console.log(res); }
+        return res;
+    }
+
+    download() {
+        let content = this.get_pgn(8);
+        content += "\n\n********** BOT STATISTICS **********\n";
+        content += "Nodes = total number of positions reached\n";
+        content += "Lookup = number of positions reached that had been previously searched and evaluated\n";
+        content += "PV = the line of best moves in UCI notation ([from square][to square])\n";
+        content += this.display_search_results(false);
+
+        let now = new Date();
+        let dateStr = 
+            now.getFullYear().toString().slice(2) + 
+            (now.getMonth() + 1).toString().padStart(2, "0") +
+            now.getDate().toString().padStart(2, "0") + "_" +
+            now.getHours().toString().padStart(2, "0") +
+            now.getMinutes().toString().padStart(2, "0");
+
+        let link = document.createElement("a");
+        let file = new Blob([content], { type: 'text/plain' });
+        link.href = URL.createObjectURL(file);
+        link.download = "chessGameResults_" + dateStr + ".txt";
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+
+    end_game() {
+        window.setTimeout(() => this.end_game_delayed(), 50);
+    }
+
+    end_game_delayed() {
+        if (confirm("Would you like to download the game results?")) {
+            this.download();
+        }
     }
 
     display(updateAll = false) {
@@ -3547,19 +3651,21 @@ class Game {
         }
     }
 
-    print_board() {
-        this.board.print_board();
+    print_board(print = true, flip = false) {
+        return this.board.print_board(print, flip);
     }
 }
 
 // HTML FUNCTIONS
 //#region
+function undo_move() { game.undo(); }
 function new_game() { game = new Game(true); }
 function switch_sides() { game = new Game(!game.playerWhite, game.fen); }
 function import_game() {
     let res = prompt("Enter FEN to import: ") + " ";
     game = new Game(res.split(" ")[1] == "w", res);
 }
+function download_game() { game.download(); }
 function open_chess_com() { open("https://www.chess.com/analysis?pgn=" + game.get_pgn()); }
 function open_lichess() { open("https://www.lichess.org/paste?pgn=" + game.get_pgn()); }
 //#endregion

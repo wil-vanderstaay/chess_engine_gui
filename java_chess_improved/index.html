@@ -32,10 +32,12 @@
                 <div id="chess-board"></div>
             </div>
             <div style="outline: 2px solid black; padding: 2px; width: 80px; height: 96vh;">
+                <button onclick="undo_move()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: -3px;" src="../imgs/undo.png"></button>
                 <button onclick="new_game()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: -3px;" src="../imgs/chess_pieces/0.png"></button>
                 <button onclick="switch_sides()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%; margin-top: 0px;" src="../imgs/swap.png"></button>
                 <br><br>
                 <button onclick="import_game()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 95%; margin-top: 0px;" src="../imgs/plus.png"></button>
+                <button onclick="download_game()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 95%; margin-top: 0px;" src="../imgs/download.png"></button>
                 <button onclick="open_chess_com()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/chesscom.png"></button>
                 <button onclick="open_lichess()" style="height: 7.5%; width: 100%;"><img draggable="false" style="height: 100%;" src="../imgs/lichess.png"></button>
             </div>
